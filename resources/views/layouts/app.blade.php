@@ -105,6 +105,20 @@
                 </div>
 
                 <div class="flex items-center gap-3">
+                    <a
+                        href="{{ route('profile.index') }}"
+                        @class([
+                            'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
+                            'bg-indigo-50 text-indigo-700' => request()->routeIs('profile.*'),
+                            'text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('profile.*'),
+                        ])
+                    >
+                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <circle cx="12" cy="8" r="3.25" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5.5 19.25c.75-3.15 3.05-4.75 6.5-4.75s5.75 1.6 6.5 4.75" />
+                        </svg>
+                        <span>Profile</span>
+                    </a>
                     <span class="hidden text-sm text-gray-500 sm:inline">Personal workspace</span>
                     <div class="flex size-9 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700 ring-1 ring-inset ring-gray-200" aria-label="Profile placeholder">
                         HT

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotesController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,4 +23,5 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/projects', [WorkspaceController::class, 'index'])->name('projects.index');
     Route::get('/projects/{project}/boards/{board}', [WorkspaceController::class, 'showBoard'])->name('projects.board');
     Route::get('/notes', [NotesController::class, 'index'])->name('notes.index');
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
 });

@@ -9,6 +9,7 @@
   - Private JavaScript drag-and-drop manager installed from a local `package.json` path and connected to Livewire through native DOM events.
   - Tenant-owned Notes schema and model foundation.
   - Custom session-based authentication with registration, login, secure session regeneration, logout, and protected workspace routes.
+  - Reactive profile settings for updating account name and email, with uniqueness validation and confirmed password changes using secure password hashing.
   - Global Eloquent `TenantScope` enforcing `user_id` ownership for Projects and Notes and filtering Boards, Columns, and Tasks through their owning Project.
   - Controller-based routing that keeps Livewire component rendering out of `routes/web.php`.
 - **Phase 5 Upgrade Possibilities:**
