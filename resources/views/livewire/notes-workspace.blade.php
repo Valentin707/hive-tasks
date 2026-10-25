@@ -1,4 +1,4 @@
-<section aria-labelledby="notes-title">
+<section aria-labelledby="notes-title" x-data="{ createNoteOpen: false }" x-on:note-created.window="createNoteOpen = false" x-on:keydown.escape.window="createNoteOpen = false">
     <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <p class="mb-2 text-sm font-medium text-indigo-600">Workspace</p>
@@ -16,30 +16,152 @@
         </label>
     </div>
 
-    @if ($notes->isNotEmpty())
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            @foreach ($notes as $note)
-                <article wire:key="note-{{ $note->id }}" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <h2 class="text-base font-semibold text-gray-900">{{ $note->title }}</h2>
-                    @if ($note->content)
-                        <p class="mt-3 whitespace-pre-line text-sm leading-6 text-gray-600">{{ \Illuminate\Support\Str::limit($note->content, 320) }}</p>
-                    @else
-                        <p class="mt-3 text-sm italic text-gray-400">No note content yet.</p>
-                    @endif
-                    <p class="mt-5 text-xs text-gray-400">Updated {{ $note->updated_at->diffForHumans() }}</p>
-                </article>
-            @endforeach
-        </div>
-    @else
-        <div class="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
-            <div class="mx-auto flex size-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 3.75h7l5 5v11.5H7a2 2 0 0 1-2-2v-12.5a2 2 0 0 1 2-2Z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 3.75v5h5M8.5 13h7M8.5 16.5h7" />
-                </svg>
+    <div class="grid min-h-[34rem] gap-5 lg:grid-cols-[minmax(17rem,0.85fr)_minmax(0,1.75fr)]">
+        <aside aria-label="Notes list" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div class="flex items-center justify-between gap-3 border-b border-gray-200 p-4">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-900">Your notes</h2>
+                    <p class="mt-0.5 text-xs text-gray-500">{{ $notes->count() }} {{ \Illuminate\Support\Str::plural('note', $notes->count()) }}</p>
+                </div>
+                <button type="button" @click="createNoteOpen = true" class="button-primary shrink-0 gap-1.5 px-3 py-2 text-xs">
+                    <span aria-hidden="true" class="text-base leading-none">+</span>
+                    <span>Add New</span>
+                </button>
             </div>
-            <h2 class="mt-4 text-sm font-semibold text-gray-900">{{ trim($search) === '' ? 'No notes yet' : 'No matching notes' }}</h2>
-            <p class="mt-1 text-sm text-gray-500">{{ trim($search) === '' ? 'Your notes will appear here.' : 'Try another note title.' }}</p>
-        </div>
-    @endif
+
+            <div class="max-h-[38rem] space-y-1 overflow-y-auto p-2">
+                @forelse ($notes as $note)
+                    <div wire:key="note-{{ $note->id }}" class="flex items-start gap-1 rounded-xl p-1 transition {{ $selectedNoteId === (int) $note->getKey() ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-200' : 'hover:bg-gray-50' }}">
+                        <button
+                            type="button"
+                            wire:click="selectNote({{ $note->id }})"
+                            @if ($selectedNoteId === (int) $note->getKey()) aria-current="page" @endif
+                            class="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                        >
+                            <span class="block truncate text-sm font-medium text-gray-800">{{ $note->title !== '' ? $note->title : 'Untitled Note' }}</span>
+                            <span class="mt-1 block truncate text-xs text-gray-500">{{ $note->content ? \Illuminate\Support\Str::limit($note->content, 90) : 'No content yet' }}</span>
+                            <span class="mt-2 block text-[11px] text-gray-400">Updated {{ $note->updated_at->diffForHumans() }}</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            wire:click="editNote({{ $note->id }})"
+                            aria-label="Edit {{ $note->title !== '' ? $note->title : 'Untitled Note' }}"
+                            title="Edit note"
+                            class="mt-1 inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-indigo-50 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m14 5 5 5M4 20l4.25-.85L19 8.4a2.12 2.12 0 0 0-3-3L5.25 16.15 4 20Z" />
+                            </svg>
+                        </button>
+
+                        <button
+                            type="button"
+                            wire:click="deleteNote({{ $note->id }})"
+                            wire:confirm="Delete this note? This action cannot be undone."
+                            wire:loading.attr="disabled"
+                            wire:target="deleteNote({{ $note->id }})"
+                            aria-label="Delete {{ $note->title !== '' ? $note->title : 'Untitled Note' }}"
+                            title="Delete note"
+                            class="mt-1 inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                        >
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                            </svg>
+                        </button>
+                    </div>
+                @empty
+                    <div class="px-4 py-10 text-center">
+                        <p class="text-sm font-medium text-gray-700">{{ trim($search) === '' ? 'No notes yet' : 'No matching notes' }}</p>
+                        <p class="mt-1 text-xs text-gray-500">{{ trim($search) === '' ? 'Create a note to get started.' : 'Try another search.' }}</p>
+                    </div>
+                @endforelse
+            </div>
+        </aside>
+
+        <section aria-label="Note editor" class="flex min-h-[34rem] flex-col rounded-2xl border border-gray-200 bg-white shadow-sm">
+            @if ($activeNote)
+                @if ($isEditingNote)
+                    <div class="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4 sm:px-7">
+                        <div class="min-w-0 flex-1">
+                            <label for="note-title" class="sr-only">Note title</label>
+                            <input id="note-title" type="text" maxlength="255" wire:model.live.debounce.1000ms="noteTitle" placeholder="Untitled Note" class="w-full border-0 bg-transparent p-0 text-lg font-semibold text-gray-900 outline-none placeholder:text-gray-400 focus:ring-0 sm:text-xl">
+                        </div>
+                        <span wire:loading wire:target="noteTitle,noteContent" class="shrink-0 text-xs text-indigo-600">Saving...</span>
+                        <span wire:loading.remove wire:target="noteTitle,noteContent" class="shrink-0 text-xs text-gray-400">Saved automatically</span>
+                        <button type="button" wire:click="finishNoteEditing" class="button-secondary shrink-0 px-3 py-1.5 text-xs">Done</button>
+                    </div>
+
+                    <label for="note-content" class="sr-only">Note content</label>
+                    <textarea
+                        id="note-content"
+                        wire:model.live.debounce.1000ms="noteContent"
+                        placeholder="Start writing..."
+                        class="min-h-[28rem] flex-1 resize-none border-0 bg-transparent px-5 py-5 text-sm leading-7 text-gray-700 outline-none placeholder:text-gray-400 focus:ring-0 sm:px-7"
+                    ></textarea>
+                @else
+                    <div class="border-b border-gray-200 px-5 py-4 sm:px-7">
+                        <h2 class="break-words text-lg font-semibold text-gray-900 sm:text-xl">{{ $activeNote->title !== '' ? $activeNote->title : 'Untitled Note' }}</h2>
+                        <p class="mt-1 text-xs text-gray-400">Updated {{ $activeNote->updated_at->diffForHumans() }}</p>
+                    </div>
+                    <div class="min-h-[28rem] flex-1 whitespace-pre-wrap break-words px-5 py-5 text-sm leading-7 text-gray-700 sm:px-7">
+                        @if ($activeNote->content)
+                            {{ $activeNote->content }}
+                        @else
+                            <span class="italic text-gray-400">No note content yet.</span>
+                        @endif
+                    </div>
+                @endif
+            @else
+                <div class="flex flex-1 flex-col items-center justify-center px-6 py-14 text-center">
+                    <div class="flex size-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                        <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 3.75h7l5 5v11.5H7a2 2 0 0 1-2-2v-12.5a2 2 0 0 1 2-2Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14 3.75v5h5M8.5 13h7M8.5 16.5h7" />
+                        </svg>
+                    </div>
+                    <h2 class="mt-4 text-sm font-semibold text-gray-900">Choose a note to edit</h2>
+                    <p class="mt-1 max-w-xs text-sm text-gray-500">Select a note from the sidebar or create a new one.</p>
+                </div>
+            @endif
+        </section>
+    </div>
+
+    <div x-cloak x-show="createNoteOpen" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" @click.self="createNoteOpen = false">
+        <section role="dialog" aria-modal="true" aria-labelledby="create-note-title" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+            <div class="mb-6 flex items-start justify-between gap-4">
+                <div>
+                    <h2 id="create-note-title" class="text-lg font-semibold text-gray-900">Create a note</h2>
+                    <p class="mt-1 text-sm text-gray-500">Add a title and start with an optional note.</p>
+                </div>
+                <button type="button" @click="createNoteOpen = false" class="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close dialog">×</button>
+            </div>
+
+            <form wire:submit="createNote">
+                <div class="mb-5">
+                    <label for="new-note-title" class="form-label">Title</label>
+                    <input id="new-note-title" type="text" wire:model="newNoteTitle" maxlength="255" required class="form-input" @error('newNoteTitle') aria-invalid="true" aria-describedby="new-note-title-error" @enderror>
+                    @error('newNoteTitle')
+                        <p id="new-note-title-error" class="form-error">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="mb-6">
+                    <label for="new-note-content" class="form-label">Content <span class="font-normal text-gray-400">(optional)</span></label>
+                    <textarea id="new-note-content" wire:model="newNoteContent" rows="5" maxlength="100000" class="form-input resize-y" @error('newNoteContent') aria-invalid="true" aria-describedby="new-note-content-error" @enderror></textarea>
+                    @error('newNoteContent')
+                        <p id="new-note-content-error" class="form-error">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <button type="button" @click="createNoteOpen = false" class="button-secondary">Cancel</button>
+                    <button type="submit" class="button-primary" wire:loading.attr="disabled" wire:target="createNote">
+                        <span wire:loading.remove wire:target="createNote">Create note</span>
+                        <span wire:loading wire:target="createNote">Creating...</span>
+                    </button>
+                </div>
+            </form>
+        </section>
+    </div>
 </section>
