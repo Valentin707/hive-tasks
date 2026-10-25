@@ -1,11 +1,17 @@
 # HiveTasks Project Status
 
 - **Project:** HiveTasks (Personal Kanban tool)
-- **Verified Tech Stack:** Laravel 13.17, PHP 8.5.12, Livewire, Tailwind CSS, Local Apache (httpd), MySQL
-- **Core Architecture Completed:**
+- **Tech Stack:** Laravel 13.17, PHP 8.5.12, Livewire, Tailwind CSS, Local Apache (httpd), MySQL
+- **Current Status:** Core Milestone 1.0.0 Completed.
+- **Core Modules Delivered:**
   - Database schema and seeders for Projects, Boards, Kanban Columns (Todo, In Progress, Done, Deployed), and Tasks.
-  - Responsive Tailwind CSS dashboard shell with sidebar and header wireframes.
-  - Private JavaScript drag-and-drop manager installed through a local `package.json` path dependency and connected to Livewire through native DOM event hooks.
-  - Notes module with a text area that auto-saves using a 1000 ms debounce.
-  - Clean routing through dedicated HTTP controllers, with route definitions kept in `routes/web.php`.
-- **Current Focus:** Ready to begin Phase 4: Multi-Profile Transition & Tenant Authentication.
+  - Responsive Tailwind dashboard shell with sidebar and header.
+  - Private JavaScript drag-and-drop manager installed from a local `package.json` path and connected to Livewire through native DOM events.
+  - Tenant-owned Notes schema and model foundation.
+  - Custom session-based authentication with registration, login, secure session regeneration, logout, and protected workspace routes.
+  - Global Eloquent `TenantScope` enforcing `user_id` ownership for Projects and Notes and filtering Boards, Columns, and Tasks through their owning Project.
+  - Controller-based routing that keeps Livewire component rendering out of `routes/web.php`.
+- **Phase 5 Upgrade Possibilities:**
+  - Horizontal column dragging.
+  - Task tags and labels.
+  - File attachments on cards.
