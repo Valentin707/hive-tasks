@@ -1,4 +1,32 @@
+import { DragDropManager } from 'drag-drop-manager';
+
 document.addEventListener('DOMContentLoaded', () => {
+    const dragDropManagers = new WeakMap();
+
+    document.querySelectorAll('[data-kanban-board]').forEach((board) => {
+        const dragDropManager = new DragDropManager();
+
+        dragDropManager.enableDropzone(board.querySelectorAll('[data-kanban-column]'));
+        dragDropManagers.set(board, dragDropManager);
+    });
+
+    new MutationObserver((records) => {
+        records.flatMap((record) => [...record.removedNodes]).forEach((node) => {
+            if (!(node instanceof Element)) {
+                return;
+            }
+
+            const removedBoards = [node, ...node.querySelectorAll('[data-kanban-board]')];
+
+            removedBoards.forEach((board) => {
+                if (board.matches('[data-kanban-board]') && !board.isConnected) {
+                    dragDropManagers.get(board)?.destroy();
+                    dragDropManagers.delete(board);
+                }
+            });
+        });
+    }).observe(document.body, { childList: true, subtree: true });
+
     const sidebar = document.querySelector('[data-mobile-sidebar]');
     const overlay = document.querySelector('[data-sidebar-overlay]');
     const menuButtons = document.querySelectorAll('[data-sidebar-toggle]');

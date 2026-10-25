@@ -13,6 +13,9 @@
         "tailwindcss": "^4.0.0",
         "vite": "^8.0.0"
     },
+    "dependencies": {
+        "drag-drop-manager": "file:../../fun_coding/drag-and-drop"
+    },
     "optionalDependencies": {
         "@laravel/multiplex": "^0.4.1"
     }

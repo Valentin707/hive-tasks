@@ -7,6 +7,7 @@
 
     <title>@yield('title', config('app.name', 'HiveTasks'))</title>
 
+    @livewireStyles
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-gray-50 font-sans text-gray-900 antialiased">
@@ -32,7 +33,7 @@
 
             <nav class="flex-1 space-y-1 px-3 py-6" aria-label="Main navigation">
                 <a
-                    href="{{ route('dashboard') }}"
+                    href="{{ route('projects.index') }}"
                     class="flex items-center gap-3 rounded-lg bg-indigo-50 px-3 py-2.5 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
                 >
                     <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -104,5 +105,6 @@
             </main>
         </div>
     </div>
+    @livewireScripts
 </body>
 </html>
