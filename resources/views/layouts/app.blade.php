@@ -70,10 +70,16 @@
                         HT
                     </div>
                     <div class="min-w-0">
-                        <p class="truncate text-sm font-medium text-gray-900">HiveTasks Workspace</p>
-                        <p class="truncate text-xs text-gray-500">Personal Kanban</p>
+                        <p class="truncate text-sm font-medium text-gray-900">{{ auth()->user()->name }}</p>
+                        <p class="truncate text-xs text-gray-500">{{ auth()->user()->email }}</p>
                     </div>
                 </div>
+                <form method="POST" action="{{ route('logout') }}" class="mt-3">
+                    @csrf
+                    <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        Sign out
+                    </button>
+                </form>
             </div>
         </aside>
 

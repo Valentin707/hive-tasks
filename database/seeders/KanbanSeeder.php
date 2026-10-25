@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use App\Models\Project;
 use Illuminate\Database\Seeder;
 
@@ -14,7 +15,12 @@ class KanbanSeeder extends Seeder
      */
     public function run(): void
     {
-        $project = Project::firstOrCreate(
+        $user = User::query()->firstOrCreate(
+            ['email' => 'test@example.com'],
+            ['name' => 'Test User', 'password' => 'password'],
+        );
+
+        $project = $user->projects()->firstOrCreate(
             ['name' => 'My First Project'],
             ['description' => 'A sample project for HiveTasks.'],
         );
