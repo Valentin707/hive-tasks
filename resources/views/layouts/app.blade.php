@@ -34,7 +34,11 @@
             <nav class="flex-1 space-y-1 px-3 py-6" aria-label="Main navigation">
                 <a
                     href="{{ route('projects.index') }}"
-                    class="flex items-center gap-3 rounded-lg bg-indigo-50 px-3 py-2.5 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                    @class([
+                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition',
+                        'bg-indigo-50 font-semibold text-indigo-700 hover:bg-indigo-100' => request()->routeIs('dashboard', 'projects.*'),
+                        'font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('dashboard', 'projects.*'),
+                    ])
                 >
                     <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <rect x="3.75" y="4.75" width="7" height="6.5" rx="1.5" />
@@ -45,8 +49,12 @@
                 </a>
 
                 <a
-                    href="{{ url('/notes') }}"
-                    class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+                    href="{{ route('notes.index') }}"
+                    @class([
+                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition',
+                        'bg-indigo-50 font-semibold text-indigo-700 hover:bg-indigo-100' => request()->routeIs('notes.*'),
+                        'font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('notes.*'),
+                    ])
                 >
                     <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M7 3.75h7l5 5v11.5H7a2 2 0 0 1-2-2v-12.5a2 2 0 0 1 2-2Z" />
