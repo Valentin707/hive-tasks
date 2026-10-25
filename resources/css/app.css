@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 
 @source '../views/**/*.blade.php';
 @source '../js/**/*.js';
@@ -12,6 +13,26 @@
 @theme {
     --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+}
+
+.dark {
+    color-scheme: dark;
+    --color-white: #191c23;
+    --color-gray-50: #101217;
+    --color-gray-100: #1b1f27;
+    --color-gray-200: #292e38;
+    --color-gray-300: #3a414e;
+    --color-gray-400: #768092;
+    --color-gray-500: #929cad;
+    --color-gray-600: #aeb7c6;
+    --color-gray-700: #c4ccd8;
+    --color-gray-800: #dce1e9;
+    --color-gray-900: #f1f3f7;
+    --color-gray-950: #07080b;
+}
+
+.dark .text-white {
+    color: #fff;
 }
 
 @layer components {

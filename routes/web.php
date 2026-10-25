@@ -24,4 +24,5 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/projects/{project}/boards/{board}', [WorkspaceController::class, 'showBoard'])->name('projects.board');
     Route::get('/notes', [NotesController::class, 'index'])->name('notes.index');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::post('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme.update');
 });

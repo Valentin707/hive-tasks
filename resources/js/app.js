@@ -3,6 +3,68 @@ import { DragDropManager } from 'drag-drop-manager';
 document.addEventListener('DOMContentLoaded', () => {
     const dragDropManagers = new WeakMap();
 
+    const themeToggle = document.querySelector('[data-theme-toggle]');
+
+    if (themeToggle instanceof HTMLButtonElement) {
+        const themeStatus = document.querySelector('[data-theme-status]');
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+        const applyTheme = (theme) => {
+            const isDark = theme === 'dark';
+            const nextTheme = isDark ? 'light' : 'dark';
+
+            document.documentElement.classList.toggle('dark', isDark);
+            themeToggle.setAttribute('aria-pressed', String(isDark));
+            themeToggle.setAttribute('aria-label', `Switch to ${nextTheme} mode`);
+
+            const themeLabel = themeToggle.querySelector('[data-theme-label]');
+            if (themeLabel) {
+                themeLabel.textContent = `${nextTheme === 'dark' ? 'Dark' : 'Light'} theme`;
+            }
+
+            themeToggle.querySelectorAll('[data-theme-icon]').forEach((icon) => {
+                icon.classList.toggle('hidden', icon.dataset.themeIcon !== nextTheme);
+            });
+        };
+
+        themeToggle.addEventListener('click', async () => {
+            const nextTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+
+            themeToggle.disabled = true;
+            themeToggle.setAttribute('aria-busy', 'true');
+            if (themeStatus) {
+                themeStatus.textContent = '';
+            }
+
+            try {
+                const response = await fetch(themeToggle.dataset.themeUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify({ theme: nextTheme }),
+                });
+                const payload = await response.json();
+
+                if (!response.ok || payload.theme !== nextTheme) {
+                    throw new Error('Unable to save the theme preference.');
+                }
+
+                applyTheme(payload.theme);
+            } catch {
+                if (themeStatus) {
+                    themeStatus.textContent = 'Could not save the theme preference. Please try again.';
+                }
+            } finally {
+                themeToggle.disabled = false;
+                themeToggle.removeAttribute('aria-busy');
+            }
+        });
+    }
+
     document.querySelectorAll('[data-kanban-board]').forEach((board) => {
         const dragDropManager = new DragDropManager();
 

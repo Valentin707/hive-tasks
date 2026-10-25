@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => auth()->user()?->theme_preference === 'dark'])>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -105,6 +105,25 @@
                 </div>
 
                 <div class="flex items-center gap-3">
+                    <button
+                        type="button"
+                        class="inline-flex size-10 items-center justify-center gap-2 rounded-lg text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:w-auto sm:px-3"
+                        data-theme-toggle
+                        data-theme-url="{{ route('profile.theme.update') }}"
+                        aria-label="Switch to {{ auth()->user()->theme_preference === 'dark' ? 'light' : 'dark' }} mode"
+                        aria-pressed="{{ auth()->user()->theme_preference === 'dark' ? 'true' : 'false' }}"
+                        title="Switch theme"
+                    >
+                        <svg data-theme-icon="dark" @class(['size-5', 'hidden' => auth()->user()->theme_preference === 'dark']) viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.2 15.2A8.4 8.4 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z" />
+                        </svg>
+                        <svg data-theme-icon="light" @class(['size-5', 'hidden' => auth()->user()->theme_preference !== 'dark']) viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3.75" />
+                            <path stroke-linecap="round" d="M12 2.75v1.5m0 15.5v1.5m9.25-9.25h-1.5m-15.5 0h-1.5m15.29-6.54-1.06 1.06M7.02 16.98l-1.06 1.06m13.08 0-1.06-1.06M7.02 7.02 5.96 5.96" />
+                        </svg>
+                        <span class="hidden text-sm font-medium sm:inline" data-theme-label>{{ auth()->user()->theme_preference === 'dark' ? 'Light theme' : 'Dark theme' }}</span>
+                    </button>
+                    <span class="sr-only" data-theme-status aria-live="polite"></span>
                     <a
                         href="{{ route('profile.index') }}"
                         @class([
