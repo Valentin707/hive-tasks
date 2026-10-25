@@ -22,10 +22,62 @@ class KanbanBoard extends Component
     #[Locked]
     public ?int $boardId = null;
 
+    #[Locked]
+    public ?int $taskColumnId = null;
+
+    public string $taskTitle = '';
+
+    public string $taskDescription = '';
+
     public function mount(int $projectId, ?int $boardId = null): void
     {
         $this->projectId = $projectId;
         $this->boardId = $boardId;
+    }
+
+    public function openTaskModal(int $columnId): void
+    {
+        $this->activeColumns()->whereKey($columnId)->firstOrFail();
+
+        $this->taskColumnId = $columnId;
+        $this->reset(['taskTitle', 'taskDescription']);
+        $this->resetValidation();
+    }
+
+    public function createTask(): void
+    {
+        $validated = $this->validate([
+            'taskColumnId' => ['required', 'integer', 'min:1'],
+            'taskTitle' => ['required', 'string', 'max:255'],
+            'taskDescription' => ['nullable', 'string', 'max:10000'],
+        ]);
+
+        $columnId = (int) $validated['taskColumnId'];
+
+        $task = DB::transaction(function () use ($columnId, $validated): Task {
+            $column = $this->activeColumns()
+                ->whereKey($columnId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $position = (int) $column->tasks()->max('position') + 1;
+
+            return $column->tasks()->create([
+                'title' => $validated['taskTitle'],
+                'description' => $validated['taskDescription'] ?: null,
+                'position' => $position,
+            ]);
+        }, 3);
+
+        $this->reset(['taskTitle', 'taskDescription']);
+        $this->taskColumnId = null;
+        $this->resetValidation();
+
+        $this->dispatch('task-created', columnId: $columnId, task: [
+            'id' => (int) $task->getKey(),
+            'title' => $task->title,
+            'description' => $task->description,
+        ]);
     }
 
     public function updateCardOrder(int $cardId, int $toColumnId, int $newPosition): void
@@ -115,5 +167,12 @@ class KanbanBoard extends Component
         abort_if($this->boardId !== null && $project->boards->isEmpty(), 404);
 
         return view('livewire.kanban-board', compact('project'));
+    }
+
+    private function activeColumns(): Builder
+    {
+        return Column::query()->whereHas('board', fn (Builder $query) => $query
+            ->where('project_id', $this->projectId)
+            ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId)));
     }
 }
