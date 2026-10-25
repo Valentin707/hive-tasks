@@ -1,27 +1,30 @@
 # HiveTasks Project Status
 
-- **Project:** HiveTasks (Personal Kanban tool)
-- **Tech Stack:** Laravel 13.17, PHP 8.5.12, Livewire, Tailwind CSS, Local Apache (httpd), MySQL
-- **Current Revision:** Core Stable Version 1.1.0 Fully Operational.
-- **Development Run:** Concluded; core Kanban, workspace, security, and account workflows are implemented.
+- **Project:** HiveTasks, a personal Kanban tool
+- **Tech Stack:** Laravel 13.17, PHP 8.5.12, Livewire, Tailwind CSS, Vite, Alpine.js, local Apache (httpd), and MySQL (`tasks_hive`)
+- **Current Revision:** Core Stable Version 1.1.0; core workspace features are operational.
 
 ## Core Platform
 
-- Database schema and seeders for Projects, Boards, Columns (Todo, In Progress, Done, Deployed), and Tasks.
-- Responsive Tailwind dashboard shell with mobile-friendly sidebar and header.
-- Custom session-based authentication with registration, login, logout, and protected workspace routes.
-- Tenant isolation through a global Eloquent `TenantScope` across Projects, Notes, Boards, Columns, and Tasks.
-- Notes workspace with debounced autosave and real-time search.
-- Controller-based routing for workspace entry points and profile settings.
-- Local JavaScript drag-and-drop manager integrated with Livewire native DOM events for task movement.
+- Relational data model and seeders for Projects, Boards, Columns, Tasks, and Notes.
+- New projects are created transactionally with a default Main Board and ordered Todo, In Progress, Done, and Deployed columns.
+- Responsive Tailwind dashboard shell with sidebar navigation, header, and mobile menu.
+- Vite-managed frontend assets, including the local drag-and-drop manager dependency and its native event bridge to Livewire.
+- Custom session-based registration, login, logout, and authentication-protected workspace routes.
+- Tenant isolation through a global Eloquent `TenantScope` on workspace models; project and note records are associated with their owning user.
+- Controller-based route entry points for Projects, Kanban, Notes, and Profile instead of mounting Livewire components in `web.php`.
 
-## Completed Retrofits & Polish
+## Workspace Features
 
-- **Form Engine:** Alpine.js quick modals for adding tasks from each Kanban column.
-- **Lifecycle Automation:** Project creation runs in a database transaction and creates a default Board with the four functional columns: Todo, In Progress, Done, and Deployed.
-- **Search Routing:** Projects and Notes workspaces use real-time `$search` query bindings with a 300 ms debounce.
-- **Security Profile Panel:** Responsive `/profile` settings panel supports validated name and email updates and securely hashed password changes.
-- **Board Engineering:** Column reorder controls activate while the handle is held; responsive drag events emit `column-reordered` and persist sequential column positions.
+- Project list with debounced live search and a validated project creation modal.
+- Kanban board with the four standard columns, debounced project selection, and live task movement with sequential position updates.
+- Add-task modal in each column; task creation assigns the selected column and appends to its task order.
+- Task cards show the title and creation date in the board view. Opening a card displays its description and editing controls in a modal.
+- Column reordering is enabled while holding the reorder handle; changes persist through the `column-reordered` event and sequential positions.
+- Notes workspace with debounced live search, note creation modal, delete confirmation, and tenant-aware note ownership.
+- Notes display in preview mode by default; the pencil control opens editing, with title and content autosaving after a 1000 ms debounce.
+- Profile settings at `/profile` support validated name/email updates and password changes with current-password verification and secure hashing.
+- Shared form styling includes focus states, validation messages, and primary/secondary action buttons.
 
 ## Future Upgrade Possibilities
 
