@@ -8,6 +8,181 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dragDropManager.enableDropzone(board.querySelectorAll('[data-kanban-column]'));
         dragDropManagers.set(board, dragDropManager);
+
+        let columnDragState = null;
+
+        const getColumns = (container) => [...container.children]
+            .filter((element) => element.matches('[data-kanban-column-wrapper]'));
+
+        const restoreColumnOrder = (state) => {
+            state.originalColumns.forEach((column, index) => {
+                state.container.insertBefore(column, state.container.children[index] ?? null);
+            });
+        };
+
+        const finishColumnDrag = (pointerId, shouldSaveOrder) => {
+            const state = columnDragState;
+
+            if (!state || state.pointerId !== pointerId) {
+                return;
+            }
+
+            const columns = getColumns(state.container);
+            const newPosition = columns.indexOf(state.column);
+            const orderChanged = columns.some((column, index) => column !== state.originalColumns[index]);
+
+            if (shouldSaveOrder && orderChanged && newPosition >= 0) {
+                state.column.dispatchEvent(new CustomEvent('column-reordered', {
+                    bubbles: true,
+                    detail: {
+                        columnId: Number(state.column.dataset.columnId),
+                        newPosition,
+                        originalColumnIds: state.originalColumns.map((column) => Number(column.dataset.columnId)),
+                    },
+                }));
+            } else if (!shouldSaveOrder || !orderChanged) {
+                restoreColumnOrder(state);
+            }
+
+            state.column.classList.remove('opacity-60');
+            state.handle.removeAttribute('aria-grabbed');
+            state.boardSection.dispatchEvent(new CustomEvent('column-reorder-end'));
+
+            if (state.handle.hasPointerCapture(pointerId)) {
+                state.handle.releasePointerCapture(pointerId);
+            }
+
+            columnDragState = null;
+        };
+
+        board.addEventListener('pointerdown', (event) => {
+            const handle = event.target instanceof Element
+                ? event.target.closest('[data-column-drag-handle]')
+                : null;
+            const column = handle?.closest('[data-kanban-column-wrapper]');
+            const container = column?.parentElement;
+            const boardSection = container?.closest('[data-kanban-board-section]');
+
+            if (
+                columnDragState
+                || event.button !== 0
+                || event.isPrimary === false
+                || !handle
+                || !column
+                || !container?.matches('[data-kanban-columns]')
+                || !boardSection
+            ) {
+                return;
+            }
+
+            const originalColumns = getColumns(container);
+
+            columnDragState = {
+                pointerId: event.pointerId,
+                handle,
+                column,
+                container,
+                boardSection,
+                originalColumns,
+                startX: event.clientX,
+                startY: event.clientY,
+                moved: false,
+            };
+
+            try {
+                handle.setPointerCapture(event.pointerId);
+            } catch {
+                // Document-level listeners still complete the drag if capture is unavailable.
+            }
+            boardSection.dispatchEvent(new CustomEvent('column-reorder-start'));
+            handle.setAttribute('aria-grabbed', 'true');
+        });
+
+        document.addEventListener('pointermove', (event) => {
+            const state = columnDragState;
+
+            if (!state || state.pointerId !== event.pointerId) {
+                return;
+            }
+
+            const movedX = event.clientX - state.startX;
+            const movedY = event.clientY - state.startY;
+
+            if (!state.moved && Math.hypot(movedX, movedY) < 4) {
+                return;
+            }
+
+            state.moved = true;
+            state.column.classList.add('opacity-60');
+            event.preventDefault();
+
+            const containerRect = state.container.getBoundingClientRect();
+
+            if (
+                event.clientX < containerRect.left
+                || event.clientX > containerRect.right
+                || event.clientY < containerRect.top
+                || event.clientY > containerRect.bottom
+            ) {
+                return;
+            }
+
+            const columns = getColumns(state.container).filter((column) => column !== state.column);
+
+            if (columns.length === 0) {
+                return;
+            }
+
+            const hitElement = document.elementFromPoint(event.clientX, event.clientY);
+            const hitColumn = hitElement instanceof Element
+                ? hitElement.closest('[data-kanban-column-wrapper]')
+                : null;
+            if (hitColumn === state.column) {
+                return;
+            }
+
+            const target = hitColumn && hitColumn.parentElement === state.container
+                ? hitColumn
+                : columns.reduce((closest, candidate) => {
+                    const rect = candidate.getBoundingClientRect();
+                    const distance = ((event.clientX - (rect.left + rect.width / 2)) / rect.width) ** 2
+                        + ((event.clientY - (rect.top + rect.height / 2)) / rect.height) ** 2;
+
+                    return distance < closest.distance ? { column: candidate, distance } : closest;
+                }, { column: columns[0], distance: Number.POSITIVE_INFINITY }).column;
+
+            const rect = target.getBoundingClientRect();
+            const gridColumnCount = getComputedStyle(state.container).gridTemplateColumns.split(' ').length;
+            const useHorizontalAxis = gridColumnCount > 1;
+            const insertAfter = useHorizontalAxis
+                ? event.clientX > rect.left + rect.width / 2
+                : event.clientY > rect.top + rect.height / 2;
+            const anchor = insertAfter ? target.nextElementSibling : target;
+
+            if (anchor !== state.column) {
+                state.container.insertBefore(state.column, anchor);
+            }
+        });
+
+        document.addEventListener('pointerup', (event) => {
+            const state = columnDragState;
+
+            if (!state || state.pointerId !== event.pointerId) {
+                return;
+            }
+
+            const rect = state.container.getBoundingClientRect();
+            const pointerInsideContainer = event.clientX >= rect.left
+                && event.clientX <= rect.right
+                && event.clientY >= rect.top
+                && event.clientY <= rect.bottom;
+
+            finishColumnDrag(event.pointerId, pointerInsideContainer);
+        });
+
+        document.addEventListener('pointercancel', (event) => {
+            finishColumnDrag(event.pointerId, false);
+        });
     });
 
     new MutationObserver((records) => {

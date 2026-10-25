@@ -11,21 +11,37 @@
 
     <div class="space-y-10">
         @forelse ($project->boards as $board)
-            <section wire:key="kanban-board-{{ $board->id }}" data-kanban-board-section aria-labelledby="board-{{ $board->id }}-title">
+            <section wire:key="kanban-board-{{ $board->id }}" data-kanban-board-section data-board-id="{{ $board->id }}" x-data="{ reorderMode: false }" x-bind:data-column-reorder-mode="reorderMode ? 'true' : 'false'" x-on:column-reorder-start="reorderMode = true" x-on:column-reorder-end="reorderMode = false" aria-labelledby="board-{{ $board->id }}-title">
                 <div class="mb-4 flex items-center justify-between">
                     <h2 id="board-{{ $board->id }}-title" class="text-base font-semibold text-gray-900">{{ $board->name }}</h2>
-                    <span class="text-sm text-gray-500" data-board-task-count>{{ $board->columns->sum(fn ($column) => $column->tasks->count()) }} tasks</span>
+                    <div class="flex items-center gap-3">
+                        <p x-cloak x-show="reorderMode" class="text-xs text-gray-500">Release the handle to finish</p>
+                        <span class="text-sm text-gray-500" data-board-task-count>{{ $board->columns->sum(fn ($column) => $column->tasks->count()) }} tasks</span>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-4" data-kanban-columns>
                     @foreach ($board->columns as $column)
-                        <section wire:key="kanban-column-{{ $column->id }}" data-kanban-column-wrapper class="min-w-0 rounded-xl border border-gray-200 bg-gray-100/70 p-3.5" aria-labelledby="column-{{ $column->id }}-title">
-                            <div class="mb-3 flex items-center justify-between px-1">
+                        <section wire:key="kanban-column-{{ $column->id }}" data-kanban-column-wrapper data-column-id="{{ $column->id }}" class="min-w-0 rounded-xl border border-gray-200 bg-gray-100/70 p-3.5 shadow-sm transition duration-150" x-bind:class="reorderMode ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md' : ''" aria-labelledby="column-{{ $column->id }}-title">
+                            <div class="mb-3 flex items-center justify-between gap-2 px-1">
                                 <div class="flex min-w-0 items-center gap-2.5">
                                     <span class="size-2 shrink-0 rounded-full bg-indigo-500"></span>
                                     <h3 id="column-{{ $column->id }}-title" class="truncate text-sm font-semibold text-gray-800">{{ $column->name }}</h3>
                                     <span class="rounded-md bg-white px-1.5 py-0.5 text-xs font-medium text-gray-500 ring-1 ring-inset ring-gray-200" data-column-task-count>{{ $column->tasks->count() }}</span>
                                 </div>
+                                <button
+                                    type="button"
+                                    data-column-drag-handle
+                                    :aria-pressed="reorderMode.toString()"
+                                    aria-label="Hold and drag to reorder this column"
+                                    title="Hold and drag to reorder"
+                                    x-bind:class="reorderMode ? 'cursor-grab text-indigo-600 hover:bg-indigo-100 active:cursor-grabbing' : 'text-gray-400 hover:bg-gray-200'"
+                                    class="touch-none inline-flex size-8 shrink-0 select-none items-center justify-center rounded-lg transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                </button>
                             </div>
 
                             <div wire:ignore wire:key="kanban-column-dropzone-{{ $column->id }}" class="min-h-24 space-y-3 rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
@@ -143,6 +159,50 @@
 
                 syncBoardCountsAndEmptyStates();
                 $wire.updateCardOrder(cardId, toColumnId, newPosition);
+            });
+
+            $wire.$el.addEventListener('column-reordered', (event) => {
+                const payload = event.detail;
+
+                if (!payload || typeof payload !== 'object') {
+                    return;
+                }
+
+                const columnId = Number(payload.columnId);
+                const newPosition = Number(payload.newPosition);
+
+                if (!Number.isSafeInteger(columnId) || !Number.isSafeInteger(newPosition) || columnId < 1 || newPosition < 0) {
+                    return;
+                }
+
+                const boardSection = event.target.closest('[data-kanban-board-section]');
+                const boardId = boardSection?.dataset.boardId;
+
+                const findColumnsContainer = () => [...$wire.$el.querySelectorAll('[data-kanban-columns]')]
+                    .find((container) => container.closest('[data-kanban-board-section]')?.dataset.boardId === boardId);
+
+                const applyOrder = (orderedColumnIds) => {
+                    const container = findColumnsContainer();
+
+                    if (!container || !Array.isArray(orderedColumnIds)) {
+                        return;
+                    }
+
+                    orderedColumnIds.forEach((orderedColumnId) => {
+                        const column = [...container.children].find((child) =>
+                            child.matches('[data-kanban-column-wrapper]')
+                            && child.dataset.columnId === String(orderedColumnId),
+                        );
+
+                        if (column) {
+                            container.append(column);
+                        }
+                    });
+                };
+
+                $wire.updateColumnOrder(columnId, newPosition)
+                    .then((orderedColumnIds) => applyOrder(orderedColumnIds))
+                    .catch(() => applyOrder(payload.originalColumnIds));
             });
 
             $wire.$el.addEventListener('task-created', (event) => {

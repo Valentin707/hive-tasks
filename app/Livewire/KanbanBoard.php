@@ -80,6 +80,63 @@ class KanbanBoard extends Component
         ]);
     }
 
+    public function updateColumnOrder(int $columnId, int $newPositionIndex): array
+    {
+        abort_if($columnId < 1 || $newPositionIndex < 0, 422);
+
+        return DB::transaction(function () use ($columnId, $newPositionIndex): array {
+            $boardId = $this->activeColumns()
+                ->whereKey($columnId)
+                ->value('board_id');
+
+            abort_if($boardId === null, 404);
+
+            $columns = $this->activeColumns()
+                ->where('board_id', $boardId)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $targetColumn = $columns->first(
+                fn (Column $column): bool => (int) $column->getKey() === $columnId,
+            );
+
+            abort_if($targetColumn === null, 404);
+
+            $orderedColumns = $columns
+                ->sort(fn (Column $left, Column $right): int => [
+                    (int) $left->position,
+                    (int) $left->getKey(),
+                ] <=> [
+                    (int) $right->position,
+                    (int) $right->getKey(),
+                ])
+                ->reject(fn (Column $column): bool => (int) $column->getKey() === $columnId)
+                ->values();
+
+            $orderedColumns->splice(
+                min($newPositionIndex, $orderedColumns->count()),
+                0,
+                [$targetColumn],
+            );
+
+            foreach ($orderedColumns as $positionIndex => $column) {
+                $position = $positionIndex + 1;
+
+                if ((int) $column->position === $position) {
+                    continue;
+                }
+
+                $column->position = $position;
+                $column->save();
+            }
+
+            return $orderedColumns
+                ->map(static fn (Column $column): int => (int) $column->getKey())
+                ->all();
+        }, 3);
+    }
+
     public function updateCardOrder(int $cardId, int $toColumnId, int $newPosition): void
     {
         abort_if($cardId < 1 || $toColumnId < 1 || $newPosition < 0, 422);
