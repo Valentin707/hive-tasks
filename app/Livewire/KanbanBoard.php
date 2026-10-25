@@ -25,9 +25,16 @@ class KanbanBoard extends Component
     #[Locked]
     public ?int $taskColumnId = null;
 
+    #[Locked]
+    public ?int $editingTaskId = null;
+
     public string $taskTitle = '';
 
     public string $taskDescription = '';
+
+    public string $editTaskTitle = '';
+
+    public string $editTaskDescription = '';
 
     public function mount(int $projectId, ?int $boardId = null): void
     {
@@ -76,8 +83,50 @@ class KanbanBoard extends Component
         $this->dispatch('task-created', columnId: $columnId, task: [
             'id' => (int) $task->getKey(),
             'title' => $task->title,
-            'description' => $task->description,
+            'createdAt' => $task->created_at?->toIso8601String(),
+            'createdAtLabel' => $task->created_at?->format('M j, Y'),
         ]);
+    }
+
+    public function openTaskEditModal(int $taskId): void
+    {
+        abort_if($taskId < 1, 422);
+
+        $task = $this->activeTasks()->whereKey($taskId)->firstOrFail();
+
+        $this->editingTaskId = (int) $task->getKey();
+        $this->editTaskTitle = $task->title;
+        $this->editTaskDescription = $task->description ?? '';
+        $this->resetValidation();
+        $this->dispatch('task-edit-opened');
+    }
+
+    public function updateTask(): void
+    {
+        abort_if($this->editingTaskId === null, 404);
+
+        $validated = $this->validate([
+            'editTaskTitle' => ['required', 'string', 'max:255'],
+            'editTaskDescription' => ['nullable', 'string', 'max:10000'],
+        ]);
+
+        $task = $this->activeTasks()->whereKey($this->editingTaskId)->firstOrFail();
+        $task->title = $validated['editTaskTitle'];
+        $task->description = $validated['editTaskDescription'] ?: null;
+        $task->save();
+
+        $taskId = (int) $task->getKey();
+        $title = $task->title;
+
+        $this->closeTaskEditModal();
+        $this->dispatch('task-updated', taskId: $taskId, title: $title);
+    }
+
+    public function closeTaskEditModal(): void
+    {
+        $this->editingTaskId = null;
+        $this->reset(['editTaskTitle', 'editTaskDescription']);
+        $this->resetValidation();
     }
 
     public function updateColumnOrder(int $columnId, int $newPositionIndex): array
@@ -229,6 +278,13 @@ class KanbanBoard extends Component
     private function activeColumns(): Builder
     {
         return Column::query()->whereHas('board', fn (Builder $query) => $query
+            ->where('project_id', $this->projectId)
+            ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId)));
+    }
+
+    private function activeTasks(): Builder
+    {
+        return Task::query()->whereHas('column.board', fn (Builder $query) => $query
             ->where('project_id', $this->projectId)
             ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId)));
     }

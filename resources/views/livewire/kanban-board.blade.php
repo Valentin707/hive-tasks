@@ -1,4 +1,4 @@
-<div data-kanban-board>
+<div data-kanban-board x-data="{ taskEditModalOpen: false }" x-on:task-edit-opened.window="taskEditModalOpen = true" x-on:task-updated.window="taskEditModalOpen = false" x-on:keydown.escape.window="if (taskEditModalOpen) { taskEditModalOpen = false; $wire.closeTaskEditModal() }">
     <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <p class="mb-2 text-sm font-medium text-indigo-600">Your workspace</p>
@@ -47,10 +47,10 @@
                             <div wire:ignore wire:key="kanban-column-dropzone-{{ $column->id }}" class="min-h-24 space-y-3 rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
                                 @foreach ($column->tasks as $task)
                                     <article class="draggable cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
-                                        <p class="text-sm font-medium leading-5 text-gray-800">{{ $task->title }}</p>
-                                        @if ($task->description)
-                                            <p class="mt-2 line-clamp-3 text-sm leading-5 text-gray-500">{{ $task->description }}</p>
-                                        @endif
+                                        <button type="button" data-task-edit-button data-task-id="{{ $task->id }}" aria-label="Open task: {{ $task->title }}" class="block w-full rounded text-left focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                            <span data-task-title class="block text-sm font-medium leading-5 text-gray-800">{{ $task->title }}</span>
+                                            <time datetime="{{ $task->created_at->toIso8601String() }}" data-task-created-at class="mt-2 block text-xs text-gray-500">Created {{ $task->created_at->format('M j, Y') }}</time>
+                                        </button>
                                     </article>
                                 @endforeach
                                 <div data-column-empty-state @class([
@@ -117,6 +117,46 @@
         @endforelse
     </div>
 
+    @if ($editingTaskId !== null)
+        <div x-cloak x-show="taskEditModalOpen" x-transition.opacity class="fixed inset-0 z-[60] flex items-center justify-center bg-gray-950/40 p-4" @click.self="taskEditModalOpen = false; $wire.closeTaskEditModal()">
+            <section role="dialog" aria-modal="true" aria-labelledby="edit-task-title" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+                <div class="mb-6 flex items-start justify-between gap-4">
+                    <div>
+                        <h2 id="edit-task-title" class="text-lg font-semibold text-gray-900">Edit task</h2>
+                        <p class="mt-1 text-sm text-gray-500">Update the task title or description.</p>
+                    </div>
+                    <button type="button" wire:click="closeTaskEditModal" @click="taskEditModalOpen = false" class="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close dialog">×</button>
+                </div>
+
+                <form wire:submit="updateTask">
+                    <div class="mb-5">
+                        <label for="edit-task-title-field" class="form-label">Title</label>
+                        <input id="edit-task-title-field" type="text" wire:model="editTaskTitle" maxlength="255" required class="form-input" @error('editTaskTitle') aria-invalid="true" aria-describedby="edit-task-title-error" @enderror>
+                        @error('editTaskTitle')
+                            <p id="edit-task-title-error" class="form-error">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="mb-6">
+                        <label for="edit-task-description" class="form-label">Description <span class="font-normal text-gray-400">(optional)</span></label>
+                        <textarea id="edit-task-description" wire:model="editTaskDescription" rows="5" maxlength="10000" class="form-input resize-y" @error('editTaskDescription') aria-invalid="true" aria-describedby="edit-task-description-error" @enderror></textarea>
+                        @error('editTaskDescription')
+                            <p id="edit-task-description-error" class="form-error">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button type="button" wire:click="closeTaskEditModal" @click="taskEditModalOpen = false" class="button-secondary">Cancel</button>
+                        <button type="submit" class="button-primary" wire:loading.attr="disabled" wire:target="updateTask">
+                            <span wire:loading.remove wire:target="updateTask">Save changes</span>
+                            <span wire:loading wire:target="updateTask">Saving...</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    @endif
+
     @script
         <script>
             const syncBoardCountsAndEmptyStates = () => {
@@ -159,6 +199,36 @@
 
                 syncBoardCountsAndEmptyStates();
                 $wire.updateCardOrder(cardId, toColumnId, newPosition);
+            });
+
+            $wire.$el.addEventListener('click', (event) => {
+                const editButton = event.target instanceof Element
+                    ? event.target.closest('[data-task-edit-button]')
+                    : null;
+
+                if (!editButton || !$wire.$el.contains(editButton)) {
+                    return;
+                }
+
+                const taskId = Number(editButton.dataset.taskId);
+
+                if (Number.isSafeInteger(taskId) && taskId > 0) {
+                    $wire.openTaskEditModal(taskId);
+                }
+            });
+
+            $wire.$el.addEventListener('task-updated', (event) => {
+                const taskId = Number(event.detail.taskId);
+                const card = [...$wire.$el.querySelectorAll('[data-item-id]')]
+                    .find((item) => item.dataset.itemId === String(taskId));
+                const title = card?.querySelector('[data-task-title]');
+
+                if (!Number.isSafeInteger(taskId) || taskId < 1 || typeof event.detail.title !== 'string' || !title) {
+                    return;
+                }
+
+                title.textContent = event.detail.title;
+                title.closest('[data-task-edit-button]')?.setAttribute('aria-label', `Open task: ${event.detail.title}`);
             });
 
             $wire.$el.addEventListener('column-reordered', (event) => {
@@ -218,17 +288,27 @@
                 card.className = 'draggable cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing';
                 card.dataset.itemId = String(task.id);
 
-                const title = document.createElement('p');
-                title.className = 'text-sm font-medium leading-5 text-gray-800';
-                title.textContent = task.title;
-                card.append(title);
+                const editButton = document.createElement('button');
+                editButton.type = 'button';
+                editButton.dataset.taskEditButton = '';
+                editButton.dataset.taskId = String(task.id);
+                editButton.setAttribute('aria-label', `Open task: ${task.title}`);
+                editButton.className = 'block w-full rounded text-left focus:outline-none focus:ring-2 focus:ring-indigo-500';
 
-                if (task.description) {
-                    const description = document.createElement('p');
-                    description.className = 'mt-2 line-clamp-3 text-sm leading-5 text-gray-500';
-                    description.textContent = task.description;
-                    card.append(description);
-                }
+                const title = document.createElement('span');
+                title.dataset.taskTitle = '';
+                title.className = 'block text-sm font-medium leading-5 text-gray-800';
+                title.textContent = task.title;
+                editButton.append(title);
+
+                const createdAt = document.createElement('time');
+                createdAt.dataset.taskCreatedAt = '';
+                createdAt.dateTime = task.createdAt;
+                createdAt.className = 'mt-2 block text-xs text-gray-500';
+                createdAt.textContent = `Created ${task.createdAtLabel}`;
+                editButton.append(createdAt);
+
+                card.append(editButton);
 
                 const emptyState = column.querySelector('[data-column-empty-state]');
 
