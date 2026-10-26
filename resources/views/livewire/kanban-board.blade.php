@@ -1,14 +1,4 @@
 <div data-kanban-board x-data="{ taskEditModalOpen: false }" x-on:task-edit-opened.window="taskEditModalOpen = true" x-on:task-updated.window="taskEditModalOpen = false" x-on:keydown.escape.window="if (taskEditModalOpen) { taskEditModalOpen = false; $wire.closeTaskEditModal() }">
-    <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-            <p class="mb-2 text-sm font-medium text-indigo-600">Your workspace</p>
-            <h1 class="text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">{{ $project->name }}</h1>
-            @if ($project->description)
-                <p class="mt-2 text-sm text-gray-500">{{ $project->description }}</p>
-            @endif
-        </div>
-    </div>
-
     <div class="space-y-10">
         @forelse ($project->boards as $board)
             <section wire:key="kanban-board-{{ $board->id }}" data-kanban-board-section data-board-id="{{ $board->id }}" x-data="{ reorderMode: false }" x-bind:data-column-reorder-mode="reorderMode ? 'true' : 'false'" x-on:column-reorder-start="reorderMode = true" x-on:column-reorder-end="reorderMode = false" aria-labelledby="board-{{ $board->id }}-title">
@@ -47,7 +37,7 @@
                             <div wire:ignore wire:key="kanban-column-dropzone-{{ $column->id }}" class="min-h-24 space-y-3 rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
                                 @foreach ($column->tasks as $task)
                                     <article class="draggable cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
-                                        <button type="button" data-task-edit-button data-task-id="{{ $task->id }}" aria-label="Open task: {{ $task->title }}" class="block w-full rounded text-left focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <button type="button" data-task-edit-button data-task-id="{{ $task->id }}" aria-label="Open task: {{ $task->title }}" class="block w-full rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                                             <span data-task-title class="block text-sm font-medium leading-5 text-gray-800">{{ $task->title }}</span>
                                             <time datetime="{{ $task->created_at->toIso8601String() }}" data-task-created-at class="mt-2 block text-xs text-gray-500">Created {{ $task->created_at->format('M j, Y') }}</time>
                                         </button>

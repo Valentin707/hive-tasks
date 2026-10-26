@@ -11,6 +11,11 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-gray-50 font-sans text-gray-900 antialiased">
+    @php
+        $userNameParts = preg_split('/\s+/', trim(auth()->user()->name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $userInitials = mb_strtoupper(mb_substr($userNameParts[0] ?? '', 0, 1).mb_substr($userNameParts[1] ?? '', 0, 1));
+    @endphp
+
     <div class="min-h-screen lg:flex">
         <button
             type="button"
@@ -29,6 +34,18 @@
                     H
                 </div>
                 <span class="text-lg font-semibold tracking-tight text-gray-900">HiveTasks</span>
+            </div>
+
+            <div class="shrink-0 border-b border-gray-100 p-4">
+                <div class="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+                    <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700" aria-hidden="true">
+                        {{ $userInitials }}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-gray-900">{{ auth()->user()->name }}</p>
+                        <p class="truncate text-xs text-gray-500">{{ auth()->user()->email }}</p>
+                    </div>
+                </div>
             </div>
 
             <nav class="flex-1 space-y-1 px-3 py-6" aria-label="Main navigation">
@@ -63,24 +80,6 @@
                     <span>Notes</span>
                 </a>
             </nav>
-
-            <div class="border-t border-gray-100 p-4">
-                <div class="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
-                    <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700" aria-hidden="true">
-                        HT
-                    </div>
-                    <div class="min-w-0">
-                        <p class="truncate text-sm font-medium text-gray-900">{{ auth()->user()->name }}</p>
-                        <p class="truncate text-xs text-gray-500">{{ auth()->user()->email }}</p>
-                    </div>
-                </div>
-                <form method="POST" action="{{ route('logout') }}" class="mt-3">
-                    @csrf
-                    <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        Sign out
-                    </button>
-                </form>
-            </div>
         </aside>
 
         <div class="flex min-h-screen min-w-0 flex-1 flex-col">
@@ -124,23 +123,51 @@
                         <span class="hidden text-sm font-medium sm:inline" data-theme-label>{{ auth()->user()->theme_preference === 'dark' ? 'Light theme' : 'Dark theme' }}</span>
                     </button>
                     <span class="sr-only" data-theme-status aria-live="polite"></span>
-                    <a
-                        href="{{ route('profile.index') }}"
-                        @class([
-                            'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
-                            'bg-indigo-50 text-indigo-700' => request()->routeIs('profile.*'),
-                            'text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('profile.*'),
-                        ])
-                    >
-                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                            <circle cx="12" cy="8" r="3.25" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5.5 19.25c.75-3.15 3.05-4.75 6.5-4.75s5.75 1.6 6.5 4.75" />
-                        </svg>
-                        <span>Profile</span>
-                    </a>
                     <span class="hidden text-sm text-gray-500 sm:inline">Personal workspace</span>
-                    <div class="flex size-9 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700 ring-1 ring-inset ring-gray-200" aria-label="Profile placeholder">
-                        HT
+
+                    <div
+                        x-data="{ open: false, suppressFocusOpen: false }"
+                        x-on:mouseenter="open = true"
+                        x-on:mouseleave="if (! $el.contains(document.activeElement)) { open = false }"
+                        x-on:focusin="if (! suppressFocusOpen) { open = true }"
+                        x-on:focusout="if (! $el.contains($event.relatedTarget)) { open = false }"
+                        x-on:click.outside="open = false"
+                        x-on:keydown.escape.window="if (open) { suppressFocusOpen = true; open = false; $refs.accountButton.focus(); $nextTick(() => { suppressFocusOpen = false }) }"
+                        class="relative"
+                    >
+                        <button
+                            type="button"
+                            x-ref="accountButton"
+                            x-on:click="open = true"
+                            x-bind:aria-expanded="open.toString()"
+                            aria-controls="account-menu"
+                            aria-label="Open account menu for {{ auth()->user()->name }}"
+                            title="{{ auth()->user()->name }}"
+                            class="flex size-9 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 transition hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            {{ $userInitials }}
+                        </button>
+
+                        <div id="account-menu" x-cloak x-show="open" x-transition.opacity class="absolute right-0 top-full z-50 w-48 pt-2">
+                            <div class="rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
+                                <a
+                                    href="{{ route('profile.index') }}"
+                                    @class([
+                                        'block rounded-lg px-3 py-2 text-sm font-medium transition',
+                                        'bg-indigo-50 text-indigo-700' => request()->routeIs('profile.*'),
+                                        'text-gray-700 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('profile.*'),
+                                    ])
+                                >
+                                    Profile
+                                </a>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-100 hover:text-gray-900">
+                                        Sign out
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -150,6 +177,15 @@
                     @yield('content')
                 </div>
             </main>
+
+            <footer class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-gray-200 bg-white px-4 py-3 text-xs text-gray-500 sm:px-6 lg:px-8" aria-label="Application information">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span class="font-medium text-gray-700">{{ config('app.name', 'HiveTasks') }}</span>
+                    <span aria-hidden="true" class="text-gray-300">·</span>
+                    <time datetime="{{ now()->toDateString() }}" data-live-date>{{ now()->format('F j, Y') }}</time>
+                </div>
+                <time class="font-mono tabular-nums text-gray-600" datetime="{{ now()->format('H:i') }}" data-live-clock>{{ now()->format('H:i') }}</time>
+            </footer>
         </div>
     </div>
     @livewireScripts

@@ -35,6 +35,19 @@
     color: #fff;
 }
 
+@layer base {
+    a[href]:not([aria-disabled='true']),
+    button:not(:disabled):not([aria-disabled='true']),
+    [role='button']:not([aria-disabled='true']) {
+        cursor: pointer;
+    }
+
+    button:disabled,
+    [aria-disabled='true'] {
+        cursor: not-allowed;
+    }
+}
+
 @layer components {
     .form-label {
         @apply mb-1.5 block text-sm font-medium text-gray-700;

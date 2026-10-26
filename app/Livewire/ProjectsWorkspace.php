@@ -61,7 +61,11 @@ class ProjectsWorkspace extends Component
         $projects = Project::query()
             ->when($search !== '', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
             ->with(['boards' => fn (HasMany $boards) => $boards->orderBy('name')])
-            ->withCount('boards')
+            ->withCount([
+                'boards as tasks_count' => fn (Builder $boards) => $boards
+                    ->join('columns', 'boards.id', '=', 'columns.board_id')
+                    ->join('tasks', 'columns.id', '=', 'tasks.column_id'),
+            ])
             ->orderBy('name')
             ->get();
 

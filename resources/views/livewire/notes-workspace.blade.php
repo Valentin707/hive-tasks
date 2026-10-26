@@ -31,12 +31,12 @@
 
             <div class="max-h-[38rem] space-y-1 overflow-y-auto p-2">
                 @forelse ($notes as $note)
-                    <div wire:key="note-{{ $note->id }}" class="flex items-start gap-1 rounded-xl p-1 transition {{ $selectedNoteId === (int) $note->getKey() ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-200' : 'hover:bg-gray-50' }}">
+                    <div wire:key="note-{{ $note->id }}" class="flex items-start gap-1 rounded-xl p-1 transition {{ $selectedNoteId === (int) $note->getKey() ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-950/40 dark:ring-indigo-800/70' : 'hover:bg-gray-50' }}">
                         <button
                             type="button"
                             wire:click="selectNote({{ $note->id }})"
                             @if ($selectedNoteId === (int) $note->getKey()) aria-current="page" @endif
-                            class="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                            class="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
                         >
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $note->title !== '' ? $note->title : 'Untitled Note' }}</span>
                             <span class="mt-1 block truncate text-xs text-gray-500">{{ $note->content ? \Illuminate\Support\Str::limit($note->content, 90) : 'No content yet' }}</span>
@@ -104,9 +104,9 @@
                         <h2 class="break-words text-lg font-semibold text-gray-900 sm:text-xl">{{ $activeNote->title !== '' ? $activeNote->title : 'Untitled Note' }}</h2>
                         <p class="mt-1 text-xs text-gray-400">Updated {{ $activeNote->updated_at->diffForHumans() }}</p>
                     </div>
-                    <div class="min-h-[28rem] flex-1 whitespace-pre-wrap break-words px-5 py-5 text-sm leading-7 text-gray-700 sm:px-7">
+                    <div class="min-h-[28rem] flex-1 break-words px-5 py-5 text-sm leading-7 text-gray-700 sm:px-7">
                         @if ($activeNote->content)
-                            {{ $activeNote->content }}
+                            <p class="whitespace-pre-wrap break-words">{{ $activeNote->content }}</p>
                         @else
                             <span class="italic text-gray-400">No note content yet.</span>
                         @endif

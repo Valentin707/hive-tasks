@@ -3,6 +3,38 @@ import { DragDropManager } from 'drag-drop-manager';
 document.addEventListener('DOMContentLoaded', () => {
     const dragDropManagers = new WeakMap();
 
+    const liveDate = document.querySelector('[data-live-date]');
+    const liveClock = document.querySelector('[data-live-clock]');
+
+    const updateDateAndClock = () => {
+        const currentTime = new Date();
+
+        if (liveDate instanceof HTMLTimeElement) {
+            liveDate.textContent = new Intl.DateTimeFormat(undefined, {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+            }).format(currentTime);
+            liveDate.dateTime = [
+                currentTime.getFullYear(),
+                String(currentTime.getMonth() + 1).padStart(2, '0'),
+                String(currentTime.getDate()).padStart(2, '0'),
+            ].join('-');
+        }
+
+        if (liveClock instanceof HTMLTimeElement) {
+            const hours = String(currentTime.getHours()).padStart(2, '0');
+            const minutes = String(currentTime.getMinutes()).padStart(2, '0');
+
+            liveClock.textContent = `${hours}:${minutes}`;
+            liveClock.dateTime = `${hours}:${minutes}`;
+        }
+    };
+
+    updateDateAndClock();
+    window.setInterval(updateDateAndClock, 1000);
+
     const themeToggle = document.querySelector('[data-theme-toggle]');
 
     if (themeToggle instanceof HTMLButtonElement) {

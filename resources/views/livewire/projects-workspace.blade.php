@@ -64,23 +64,22 @@
     </div>
 
     @if ($projects->isNotEmpty())
-        <div class="space-y-5">
+        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
             @foreach ($projects as $project)
                 <section wire:key="project-{{ $project->id }}" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="project-{{ $project->id }}-title">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0">
                             <h2 id="project-{{ $project->id }}-title" class="truncate text-lg font-semibold text-gray-900">{{ $project->name }}</h2>
-                            @if ($project->description)
-                                <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-500">{{ $project->description }}</p>
-                            @endif
+                            <p class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
+                                <time datetime="{{ $project->created_at->toDateString() }}">Created {{ $project->created_at->format('M j, Y') }}</time>
+                                <span aria-hidden="true">·</span>
+                                <span>{{ $project->tasks_count }} {{ \Illuminate\Support\Str::plural('task', $project->tasks_count) }}</span>
+                            </p>
                         </div>
-                        <span class="inline-flex w-fit shrink-0 items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
-                            {{ $project->boards_count }} {{ \Illuminate\Support\Str::plural('board', $project->boards_count) }}
-                        </span>
                     </div>
 
                     @if ($project->boards->isNotEmpty())
-                        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                             @foreach ($project->boards as $board)
                                 <a wire:key="board-{{ $board->id }}" href="{{ route('projects.board', ['project' => $project, 'board' => $board]) }}" class="group flex items-center justify-between gap-4 rounded-xl border border-gray-200 p-4 transition duration-150 hover:border-indigo-300 hover:bg-indigo-50/50">
                                     <div class="flex min-w-0 items-center gap-3">
