@@ -57,8 +57,8 @@
                                     Add Task
                                 </button>
 
-                                <div x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" @click.self="open = false">
-                                    <section role="dialog" aria-modal="true" aria-labelledby="new-task-title-{{ $column->id }}" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+                                <div x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 sm:items-center" @click.self="open = false">
+                                    <section role="dialog" aria-modal="true" aria-labelledby="new-task-title-{{ $column->id }}" class="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-7">
                                         <div class="mb-6 flex items-start justify-between gap-4">
                                             <div>
                                                 <h2 id="new-task-title-{{ $column->id }}" class="text-lg font-semibold text-gray-900">Add task to {{ $column->name }}</h2>
@@ -108,8 +108,8 @@
     </div>
 
     @if ($editingTaskId !== null)
-        <div x-cloak x-show="taskEditModalOpen" x-transition.opacity class="fixed inset-0 z-[60] flex items-center justify-center bg-gray-950/40 p-4" @click.self="taskEditModalOpen = false; $wire.closeTaskEditModal()">
-            <section role="dialog" aria-modal="true" aria-labelledby="edit-task-title" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+        <div x-cloak x-show="taskEditModalOpen" x-transition.opacity class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 sm:items-center" @click.self="taskEditModalOpen = false; $wire.closeTaskEditModal()">
+            <section role="dialog" aria-modal="true" aria-labelledby="edit-task-title" class="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-7">
                 <div class="mb-6 flex items-start justify-between gap-4">
                     <div>
                         <h2 id="edit-task-title" class="text-lg font-semibold text-gray-900">Edit task</h2>

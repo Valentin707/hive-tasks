@@ -22,8 +22,8 @@
                     New Project
                 </button>
 
-                <div x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" @click.self="open = false">
-                    <section role="dialog" aria-modal="true" aria-labelledby="new-project-title" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+                <div x-cloak x-show="open" x-transition.opacity class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 sm:items-center" @click.self="open = false">
+                    <section role="dialog" aria-modal="true" aria-labelledby="new-project-title" class="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-7">
                         <div class="mb-6 flex items-start justify-between gap-4">
                             <div>
                                 <h2 id="new-project-title" class="text-lg font-semibold text-gray-900">Create a project</h2>
