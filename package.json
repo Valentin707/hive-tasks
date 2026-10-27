@@ -14,7 +14,8 @@
         "vite": "^8.0.0"
     },
     "dependencies": {
-        "drag-drop-manager": "file:../../fun_coding/drag-and-drop"
+        "drag-drop-manager": "file:../../fun_coding/drag-and-drop",
+        "quill": "^2.0.3"
     },
     "optionalDependencies": {
         "@laravel/multiplex": "^0.4.1"

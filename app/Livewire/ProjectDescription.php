@@ -45,7 +45,7 @@ class ProjectDescription extends Component
         ]);
 
         $project = $this->ownedProject();
-        $project->description = $validated['description'] ?: null;
+        $project->description = RichTextSanitizer::sanitize($validated['description'] ?? '') ?: null;
         $project->save();
 
         $this->description = $project->description ?? '';
@@ -55,8 +55,11 @@ class ProjectDescription extends Component
 
     public function render(): View
     {
+        $project = $this->ownedProject();
+
         return view('livewire.project-description', [
-            'project' => $this->ownedProject(),
+            'project' => $project,
+            'descriptionHtml' => RichTextSanitizer::sanitize($project->description ?? ''),
         ]);
     }
 

@@ -32,7 +32,7 @@ class ProjectsWorkspace extends Component
         DB::transaction(function () use ($validated, $userId): void {
             $project = new Project([
                 'name' => $validated['name'],
-                'description' => $validated['description'] ?: null,
+                'description' => RichTextSanitizer::sanitize($validated['description'] ?? '') ?: null,
             ]);
             $project->user_id = $userId;
             $project->save();
@@ -68,7 +68,8 @@ class ProjectsWorkspace extends Component
             ])
             ->orderBy('name')
             ->get();
+        $descriptionHtml = RichTextSanitizer::sanitize($this->description);
 
-        return view('livewire.projects-workspace', compact('projects'));
+        return view('livewire.projects-workspace', compact('projects', 'descriptionHtml'));
     }
 }

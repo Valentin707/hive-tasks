@@ -1,4 +1,5 @@
 import { DragDropManager } from 'drag-drop-manager';
+import './quill-rich-text-editor.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dragDropManagers = new WeakMap();

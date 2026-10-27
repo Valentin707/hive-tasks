@@ -39,7 +39,7 @@
                             class="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
                         >
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $note->title !== '' ? $note->title : 'Untitled Note' }}</span>
-                            <span class="mt-1 block truncate text-xs text-gray-500">{{ $note->content ? \Illuminate\Support\Str::limit($note->content, 90) : 'No content yet' }}</span>
+                            <span class="mt-1 block truncate text-xs text-gray-500">{{ $note->content ? \Illuminate\Support\Str::limit(html_entity_decode(strip_tags($note->content), ENT_QUOTES | ENT_HTML5, 'UTF-8'), 90) : 'No content yet' }}</span>
                             <span class="mt-2 block text-[11px] text-gray-400">Updated {{ $note->updated_at->diffForHumans() }}</span>
                         </button>
 
@@ -92,21 +92,26 @@
                         <button type="button" wire:click="finishNoteEditing" class="button-secondary shrink-0 px-3 py-1.5 text-xs">Done</button>
                     </div>
 
-                    <label for="note-content" class="sr-only">Note content</label>
-                    <textarea
-                        id="note-content"
-                        wire:model.live.debounce.1000ms="noteContent"
-                        placeholder="Start writing..."
-                        class="min-h-[28rem] flex-1 resize-none border-0 bg-transparent px-5 py-5 text-sm leading-7 text-gray-700 outline-none placeholder:text-gray-400 focus:ring-0 sm:px-7"
-                    ></textarea>
+                    <div
+                        wire:key="quill-note-editor-{{ $selectedNoteId }}"
+                        x-data="quillRichTextEditor({ placeholder: 'Start writing...', ariaLabel: 'Note content', minHeight: '28rem' })"
+                        x-init="$nextTick(() => initialize())"
+                        class="flex-1 p-5 sm:px-7"
+                    >
+                        <div class="quill-rich-text-editor" wire:ignore>
+                            <div x-ref="editor"></div>
+                        </div>
+                        <textarea x-ref="contentInput" wire:model.live.debounce.1000ms="noteContent" aria-hidden="true" tabindex="-1" class="hidden">{{ $noteContent }}</textarea>
+                        <textarea x-ref="initialHtml" aria-hidden="true" tabindex="-1" class="hidden">{{ $activeNoteHtml }}</textarea>
+                    </div>
                 @else
                     <div class="border-b border-gray-200 px-5 py-4 sm:px-7">
                         <h2 class="break-words text-lg font-semibold text-gray-900 sm:text-xl">{{ $activeNote->title !== '' ? $activeNote->title : 'Untitled Note' }}</h2>
                         <p class="mt-1 text-xs text-gray-400">Updated {{ $activeNote->updated_at->diffForHumans() }}</p>
                     </div>
                     <div class="min-h-[28rem] flex-1 break-words px-5 py-5 text-sm leading-7 text-gray-700 sm:px-7">
-                        @if ($activeNote->content)
-                            <p class="whitespace-pre-wrap break-words">{{ $activeNote->content }}</p>
+                        @if ($activeNoteHtml !== '')
+                            <div class="ql-editor quill-content-display">{!! $activeNoteHtml !!}</div>
                         @else
                             <span class="italic text-gray-400">No note content yet.</span>
                         @endif
@@ -147,8 +152,18 @@
                 </div>
 
                 <div class="mb-6">
-                    <label for="new-note-content" class="form-label">Content <span class="font-normal text-gray-400">(optional)</span></label>
-                    <textarea id="new-note-content" wire:model="newNoteContent" rows="5" maxlength="100000" class="form-input resize-y" @error('newNoteContent') aria-invalid="true" aria-describedby="new-note-content-error" @enderror></textarea>
+                    <p class="form-label">Content <span class="font-normal text-gray-400">(optional)</span></p>
+                    <div
+                        x-data="quillRichTextEditor({ placeholder: 'Start writing...', ariaLabel: 'New note content', minHeight: '12rem' })"
+                        x-init="$nextTick(() => initialize())"
+                        x-on:note-created.window="clear()"
+                    >
+                        <div class="quill-rich-text-editor" wire:ignore>
+                            <div x-ref="editor"></div>
+                        </div>
+                        <textarea x-ref="contentInput" wire:model="newNoteContent" aria-hidden="true" tabindex="-1" class="hidden">{{ $newNoteContent }}</textarea>
+                        <textarea x-ref="initialHtml" aria-hidden="true" tabindex="-1" class="hidden">{{ $newNoteContentHtml }}</textarea>
+                    </div>
                     @error('newNoteContent')
                         <p id="new-note-content-error" class="form-error">{{ $message }}</p>
                     @enderror

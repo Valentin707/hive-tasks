@@ -42,8 +42,18 @@
                             </div>
 
                             <div class="mb-6">
-                                <label for="project-description" class="form-label">Description <span class="font-normal text-gray-400">(optional)</span></label>
-                                <textarea id="project-description" wire:model="description" rows="4" maxlength="20000" class="form-input resize-y" @error('description') aria-invalid="true" aria-describedby="project-description-error" @enderror></textarea>
+                                <p class="form-label">Description <span class="font-normal text-gray-400">(optional)</span></p>
+                                <div
+                                    x-data="quillRichTextEditor({ placeholder: 'Add project details...', ariaLabel: 'New project description', minHeight: '10rem' })"
+                                    x-init="$nextTick(() => initialize())"
+                                    x-on:project-created.window="clear()"
+                                >
+                                    <div class="quill-rich-text-editor" wire:ignore>
+                                        <div x-ref="editor"></div>
+                                    </div>
+                                    <textarea x-ref="contentInput" wire:model="description" aria-hidden="true" tabindex="-1" class="hidden">{{ $description }}</textarea>
+                                    <textarea x-ref="initialHtml" aria-hidden="true" tabindex="-1" class="hidden">{{ $descriptionHtml }}</textarea>
+                                </div>
                                 @error('description')
                                     <p id="project-description-error" class="form-error">{{ $message }}</p>
                                 @enderror

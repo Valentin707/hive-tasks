@@ -15,15 +15,18 @@
     @if ($isEditing)
         <form wire:submit="saveDescription" class="mt-6">
             <div>
-                <label for="project-description-{{ $projectId }}" class="form-label">Project description</label>
-                <textarea
-                    id="project-description-{{ $projectId }}"
-                    wire:model="description"
-                    rows="8"
-                    maxlength="20000"
-                    class="form-input resize-y"
-                    @error('description') aria-invalid="true" aria-describedby="project-description-error-{{ $projectId }}" @enderror
-                ></textarea>
+                <p class="form-label">Project description</p>
+                <div
+                    wire:key="project-description-editor-{{ $projectId }}"
+                    x-data="quillRichTextEditor({ placeholder: 'Add project details...', ariaLabel: 'Project description', minHeight: '16rem' })"
+                    x-init="$nextTick(() => initialize())"
+                >
+                    <div class="quill-rich-text-editor" wire:ignore>
+                        <div x-ref="editor"></div>
+                    </div>
+                    <textarea x-ref="contentInput" wire:model="description" aria-hidden="true" tabindex="-1" class="hidden">{{ $description }}</textarea>
+                    <textarea x-ref="initialHtml" aria-hidden="true" tabindex="-1" class="hidden">{{ $descriptionHtml }}</textarea>
+                </div>
                 @error('description')
                     <p id="project-description-error-{{ $projectId }}" class="form-error">{{ $message }}</p>
                 @enderror
@@ -41,8 +44,8 @@
         </form>
     @else
         <div class="mt-6 rounded-xl bg-gray-50 px-4 py-5 sm:px-5">
-            @if ($project->description)
-                <p class="whitespace-pre-line text-sm leading-7 text-gray-700">{{ $project->description }}</p>
+            @if ($descriptionHtml !== '')
+                <div class="ql-editor quill-content-display">{!! $descriptionHtml !!}</div>
             @else
                 <p class="text-sm leading-6 text-gray-500">No description has been added yet. Add a few details to give this project context.</p>
             @endif

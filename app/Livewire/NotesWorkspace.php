@@ -42,7 +42,7 @@ class NotesWorkspace extends Component
         $note = new Note;
         $note->user_id = (int) $userId;
         $note->title = $validated['newNoteTitle'];
-        $note->content = $validated['newNoteContent'] ?? '';
+        $note->content = RichTextSanitizer::sanitize($validated['newNoteContent'] ?? '');
         $note->save();
 
         $this->search = '';
@@ -119,8 +119,12 @@ class NotesWorkspace extends Component
         $activeNote = $this->selectedNoteId === null
             ? null
             : Note::query()->find($this->selectedNoteId);
+        $activeNoteHtml = $activeNote === null
+            ? ''
+            : RichTextSanitizer::sanitize($activeNote->content ?? '');
+        $newNoteContentHtml = RichTextSanitizer::sanitize($this->newNoteContent);
 
-        return view('livewire.notes-workspace', compact('notes', 'activeNote'));
+        return view('livewire.notes-workspace', compact('notes', 'activeNote', 'activeNoteHtml', 'newNoteContentHtml'));
     }
 
     private function selectNoteState(Note $note): void
@@ -151,7 +155,7 @@ class NotesWorkspace extends Component
 
         $note = Note::query()->findOrFail($this->selectedNoteId);
         $note->title = $validated['noteTitle'];
-        $note->content = $validated['noteContent'];
+        $note->content = RichTextSanitizer::sanitize($validated['noteContent']);
         $note->save();
     }
 }
