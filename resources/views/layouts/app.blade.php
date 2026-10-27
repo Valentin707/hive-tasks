@@ -14,6 +14,14 @@
     @php
         $userNameParts = preg_split('/\s+/', trim(auth()->user()->name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $userInitials = mb_strtoupper(mb_substr($userNameParts[0] ?? '', 0, 1).mb_substr($userNameParts[1] ?? '', 0, 1));
+        $pageTitle = trim(strip_tags($__env->yieldContent('title', config('app.name', 'HiveTasks'))));
+        $pageSubtitle = match (true) {
+            request()->routeIs('projects.board') => 'Kanban board',
+            request()->routeIs('projects.index', 'dashboard') => 'Project workspace',
+            request()->routeIs('notes.index') => 'Notes workspace',
+            request()->routeIs('profile.index') => 'Account settings',
+            default => 'Workspace',
+        };
     @endphp
 
     <div
@@ -156,8 +164,8 @@
                         </svg>
                     </button>
                     <div class="min-w-0">
-                        <p class="truncate text-sm font-semibold text-gray-900">My First Project</p>
-                        <p class="hidden text-xs text-gray-500 sm:block">Workspace</p>
+                        <p class="truncate text-sm font-semibold text-gray-900">{{ $pageTitle }}</p>
+                        <p class="hidden text-xs text-gray-500 sm:block">{{ $pageSubtitle }}</p>
                     </div>
                 </div>
 

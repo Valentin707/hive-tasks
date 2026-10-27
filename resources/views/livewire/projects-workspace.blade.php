@@ -89,9 +89,9 @@
                     </div>
 
                     @if ($project->boards->isNotEmpty())
-                        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                        <div class="mt-5 grid grid-cols-1 gap-3">
                             @foreach ($project->boards as $board)
-                                <a wire:key="board-{{ $board->id }}" href="{{ route('projects.board', ['project' => $project, 'board' => $board]) }}" class="group flex items-center justify-between gap-4 rounded-xl border border-gray-200 p-4 transition duration-150 hover:border-indigo-300 hover:bg-indigo-50/50">
+                                <a wire:key="board-{{ $board->id }}" href="{{ route('projects.board', ['project' => $project, 'board' => $board]) }}" class="group flex w-full items-center justify-between gap-4 rounded-xl border border-gray-200 p-4 transition duration-150 hover:border-indigo-300 hover:bg-indigo-50/50">
                                     <div class="flex min-w-0 items-center gap-3">
                                         <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-100">
                                             <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">

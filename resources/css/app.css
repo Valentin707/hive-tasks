@@ -36,6 +36,10 @@
     color: #fff;
 }
 
+.dark .button-primary {
+    color: #fff;
+}
+
 @layer base {
     a[href]:not([aria-disabled='true']),
     button:not(:disabled):not([aria-disabled='true']),
