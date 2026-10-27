@@ -16,43 +16,95 @@
         $userInitials = mb_strtoupper(mb_substr($userNameParts[0] ?? '', 0, 1).mb_substr($userNameParts[1] ?? '', 0, 1));
     @endphp
 
-    <div class="min-h-screen lg:flex">
+    <div
+        x-data="{
+            sidebarOpen: window.matchMedia('(min-width: 1024px)').matches && (() => {
+                try {
+                    return window.localStorage.getItem('hivetasks.sidebarOpen') !== 'closed';
+                } catch {
+                    return true;
+                }
+            })(),
+            desktopViewport: window.matchMedia('(min-width: 1024px)').matches,
+            readSidebarPreference() {
+                try {
+                    return window.localStorage.getItem('hivetasks.sidebarOpen') !== 'closed';
+                } catch {
+                    return true;
+                }
+            },
+            toggleSidebar() {
+                this.sidebarOpen = !this.sidebarOpen;
+
+                if (this.desktopViewport) {
+                    try {
+                        window.localStorage.setItem('hivetasks.sidebarOpen', this.sidebarOpen ? 'open' : 'closed');
+                    } catch {
+                        // Keep the toggle usable when browser storage is unavailable.
+                    }
+                }
+            },
+            syncViewport() {
+                const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+
+                if (isDesktop !== this.desktopViewport) {
+                    this.desktopViewport = isDesktop;
+                    this.sidebarOpen = isDesktop ? this.readSidebarPreference() : false;
+                }
+            },
+        }"
+        x-on:resize.window.debounce.100ms="syncViewport()"
+        x-on:keydown.escape.window="if (!desktopViewport) { sidebarOpen = false; $nextTick(() => $refs.sidebarToggle.focus()) }"
+        class="min-h-screen lg:flex"
+    >
         <button
             type="button"
-            class="fixed inset-0 z-30 hidden bg-gray-950/40 backdrop-blur-[1px] lg:hidden"
+            x-cloak
+            x-show="sidebarOpen && !desktopViewport"
+            x-transition.opacity
+            @click="sidebarOpen = false; $nextTick(() => $refs.sidebarToggle.focus())"
+            class="fixed inset-0 z-30 bg-gray-950/40 backdrop-blur-[1px]"
             aria-label="Close navigation menu"
-            data-sidebar-overlay
         ></button>
 
         <aside
             id="primary-navigation"
-            class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-gray-200 bg-white transition-transform duration-200 ease-out lg:static lg:z-auto lg:translate-x-0"
-            data-mobile-sidebar
+            x-cloak
+            class="fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white shadow-xl transition-all duration-300 ease-in-out lg:static lg:inset-y-auto lg:left-auto lg:z-auto lg:shadow-none"
+            :class="sidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full lg:w-16 lg:translate-x-0'"
+            :inert="!sidebarOpen && !desktopViewport"
+            :aria-hidden="(!sidebarOpen && !desktopViewport).toString()"
         >
-            <div class="flex h-16 shrink-0 items-center gap-3 border-b border-gray-100 px-6">
-                <div class="flex size-9 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-sm">
-                    H
+            <div class="flex h-16 shrink-0 items-center gap-3 border-b border-gray-100 px-3">
+                <div class="flex min-w-0 items-center gap-3">
+                    <div class="flex size-9 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-sm">
+                        H
+                    </div>
+                    <span x-cloak x-show="sidebarOpen" x-transition.opacity class="truncate text-lg font-semibold tracking-tight text-gray-900">HiveTasks</span>
                 </div>
-                <span class="text-lg font-semibold tracking-tight text-gray-900">HiveTasks</span>
             </div>
 
-            <div class="shrink-0 border-b border-gray-100 p-4">
-                <div class="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+            <div class="shrink-0 border-b border-gray-100 p-2" :class="sidebarOpen ? 'lg:p-4' : 'lg:p-2'">
+                <div class="flex items-center gap-3 rounded-xl bg-gray-50 p-3" :class="sidebarOpen ? '' : 'lg:justify-center lg:bg-transparent lg:p-0'">
                     <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700" aria-hidden="true">
                         {{ $userInitials }}
                     </div>
-                    <div class="min-w-0">
+                    <div x-cloak x-show="sidebarOpen" x-transition.opacity class="min-w-0">
                         <p class="truncate text-sm font-medium text-gray-900">{{ auth()->user()->name }}</p>
                         <p class="truncate text-xs text-gray-500">{{ auth()->user()->email }}</p>
                     </div>
                 </div>
             </div>
 
-            <nav class="flex-1 space-y-1 px-3 py-6" aria-label="Main navigation">
+            <nav class="flex-1 space-y-1 px-2 py-6" aria-label="Main navigation">
                 <a
                     href="{{ route('projects.index') }}"
+                    title="Projects"
+                    aria-label="Projects"
+                    x-on:click="if (!desktopViewport) sidebarOpen = false"
+                    :class="sidebarOpen ? 'justify-start px-3' : 'justify-center px-2'"
                     @class([
-                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition',
+                        'flex items-center gap-3 rounded-lg py-2.5 text-sm transition',
                         'bg-indigo-50 font-semibold text-indigo-700 hover:bg-indigo-100' => request()->routeIs('dashboard', 'projects.*'),
                         'font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('dashboard', 'projects.*'),
                     ])
@@ -62,13 +114,17 @@
                         <rect x="13.25" y="4.75" width="7" height="14.5" rx="1.5" />
                         <rect x="3.75" y="14.25" width="7" height="5" rx="1.5" />
                     </svg>
-                    <span>Projects</span>
+                    <span x-cloak x-show="sidebarOpen" x-transition.opacity>Projects</span>
                 </a>
 
                 <a
                     href="{{ route('notes.index') }}"
+                    title="Notes"
+                    aria-label="Notes"
+                    x-on:click="if (!desktopViewport) sidebarOpen = false"
+                    :class="sidebarOpen ? 'justify-start px-3' : 'justify-center px-2'"
                     @class([
-                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition',
+                        'flex items-center gap-3 rounded-lg py-2.5 text-sm transition',
                         'bg-indigo-50 font-semibold text-indigo-700 hover:bg-indigo-100' => request()->routeIs('notes.*'),
                         'font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('notes.*'),
                     ])
@@ -77,7 +133,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M7 3.75h7l5 5v11.5H7a2 2 0 0 1-2-2v-12.5a2 2 0 0 1 2-2Z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14 3.75v5h5M8.5 13h7M8.5 16.5h7" />
                     </svg>
-                    <span>Notes</span>
+                    <span x-cloak x-show="sidebarOpen" x-transition.opacity>Notes</span>
                 </a>
             </nav>
         </aside>
@@ -87,11 +143,13 @@
                 <div class="flex min-w-0 items-center gap-3">
                     <button
                         type="button"
-                        class="-ml-2 inline-flex size-10 items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 lg:hidden"
-                        aria-label="Open navigation menu"
+                        x-ref="sidebarToggle"
+                        @click="toggleSidebar()"
+                        :aria-label="sidebarOpen ? 'Collapse navigation menu' : 'Open navigation menu'"
+                        :aria-expanded="sidebarOpen.toString()"
                         aria-controls="primary-navigation"
-                        aria-expanded="false"
-                        data-sidebar-toggle
+                        :title="sidebarOpen ? 'Collapse navigation menu' : 'Open navigation menu'"
+                        class="-ml-2 inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                         <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                             <path stroke-linecap="round" d="M4 6.75h16M4 12h16M4 17.25h16" />
