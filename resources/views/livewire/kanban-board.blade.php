@@ -1,11 +1,15 @@
 <div
     data-kanban-board
-    x-data="{ taskEditModalOpen: false, createColumnModalOpen: false }"
+    x-data="{ taskEditModalOpen: false, createColumnModalOpen: false, editColumnModalOpen: false, deleteColumnModalOpen: false, columnDeleteName: '', columnDeleteTaskCount: 0, deleteConfirmationInput: '' }"
     x-on:task-edit-opened.window="taskEditModalOpen = true"
     x-on:task-updated.window="taskEditModalOpen = false"
     x-on:column-create-opened.window="createColumnModalOpen = true"
     x-on:column-created.window="createColumnModalOpen = false"
-    x-on:keydown.escape.window="if (taskEditModalOpen) { taskEditModalOpen = false; $wire.closeTaskEditModal() } if (createColumnModalOpen) { createColumnModalOpen = false; $wire.closeCreateColumnModal() }"
+    x-on:column-edit-opened.window="editColumnModalOpen = true"
+    x-on:column-updated.window="editColumnModalOpen = false"
+    x-on:column-delete-opened.window="deleteColumnModalOpen = true; columnDeleteName = $event.detail.columnName; columnDeleteTaskCount = Number($event.detail.taskCount); deleteConfirmationInput = ''"
+    x-on:column-deleted.window="deleteColumnModalOpen = false; columnDeleteName = ''; columnDeleteTaskCount = 0; deleteConfirmationInput = ''"
+    x-on:keydown.escape.window="if (taskEditModalOpen) { taskEditModalOpen = false; $wire.closeTaskEditModal() } if (createColumnModalOpen) { createColumnModalOpen = false; $wire.closeCreateColumnModal() } if (editColumnModalOpen) { editColumnModalOpen = false; $wire.closeEditColumnModal() } if (deleteColumnModalOpen) { deleteColumnModalOpen = false; deleteConfirmationInput = ''; $wire.closeDeleteColumnConfirmation() }"
 >
     <div class="space-y-10">
         @forelse ($project->boards as $board)
@@ -35,23 +39,49 @@
                         <section wire:key="kanban-column-{{ $column->id }}" data-kanban-column-wrapper data-column-id="{{ $column->id }}" class="flex h-full w-[min(20rem,calc(100vw-2rem))] shrink-0 flex-col rounded-xl border border-gray-200 bg-gray-100/70 p-3.5 shadow-sm transition duration-150" x-bind:class="reorderMode ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md' : ''" aria-labelledby="column-{{ $column->id }}-title">
                             <div class="mb-3 flex items-center justify-between gap-2 px-1">
                                 <div class="flex min-w-0 items-center gap-2.5">
-                                    <span class="size-2 shrink-0 rounded-full" style="background-color: hsl({{ ((int) $column->getKey() * 137) % 360 }} 72% 50%)"></span>
+                                    <span class="size-2 shrink-0 rounded-full" style="background-color: {{ $column->color }}"></span>
                                     <h3 id="column-{{ $column->id }}-title" class="truncate text-sm font-semibold text-gray-800">{{ $column->name }}</h3>
                                     <span class="rounded-md bg-white px-1.5 py-0.5 text-xs font-medium text-gray-500 ring-1 ring-inset ring-gray-200" data-column-task-count>{{ $column->tasks->count() }}</span>
                                 </div>
-                                <button
-                                    type="button"
-                                    data-column-drag-handle
-                                    :aria-pressed="reorderMode.toString()"
-                                    aria-label="Hold and drag to reorder this column"
-                                    title="Hold and drag to reorder"
-                                    x-bind:class="reorderMode ? 'cursor-grab text-indigo-600 hover:bg-indigo-100 active:cursor-grabbing' : 'text-gray-400 hover:bg-gray-200'"
-                                    class="touch-none inline-flex size-8 shrink-0 select-none items-center justify-center rounded-lg transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                >
-                                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                        <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
-                                    </svg>
-                                </button>
+                                <div class="relative flex shrink-0 items-center gap-1" x-data="{ menuOpen: false }" x-on:click.outside="menuOpen = false" x-on:keydown.escape.window="menuOpen = false">
+                                    <button
+                                        type="button"
+                                        data-column-drag-handle
+                                        :aria-pressed="reorderMode.toString()"
+                                        aria-label="Hold and drag to reorder this column"
+                                        title="Hold and drag to reorder"
+                                        x-bind:class="reorderMode ? 'cursor-grab text-indigo-600 hover:bg-indigo-100 active:cursor-grabbing' : 'text-gray-400 hover:bg-gray-200'"
+                                        class="touch-none inline-flex size-8 shrink-0 select-none items-center justify-center rounded-lg transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                            <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-haspopup="menu"
+                                        aria-controls="column-menu-{{ $column->id }}"
+                                        x-bind:aria-expanded="menuOpen.toString()"
+                                        aria-label="Column options"
+                                        title="Column options"
+                                        @click="menuOpen = ! menuOpen"
+                                        class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-200 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:hover:bg-gray-700"
+                                    >
+                                        <svg class="size-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <circle cx="5" cy="12" r="1.7" />
+                                            <circle cx="12" cy="12" r="1.7" />
+                                            <circle cx="19" cy="12" r="1.7" />
+                                        </svg>
+                                    </button>
+                                    <div id="column-menu-{{ $column->id }}" x-cloak x-show="menuOpen" x-transition.opacity role="menu" class="absolute right-0 top-full z-30 mt-1 w-44 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
+                                        <button type="button" role="menuitem" wire:click="openEditColumnModal({{ $column->id }})" @click="menuOpen = false" class="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-100 hover:text-gray-900">
+                                            Edit column
+                                        </button>
+                                        <button type="button" role="menuitem" wire:click="openDeleteColumnConfirmation({{ $column->id }})" @click="menuOpen = false" class="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40">
+                                            Delete column
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             <div wire:ignore wire:key="kanban-column-dropzone-{{ $column->id }}" class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
@@ -177,6 +207,89 @@
                         <button type="submit" class="button-primary" wire:loading.attr="disabled" wire:target="createColumn">
                             <span wire:loading.remove wire:target="createColumn">Add column</span>
                             <span wire:loading wire:target="createColumn">Adding...</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    @endif
+
+    @if ($editingColumnId !== null)
+        <div x-cloak x-show="editColumnModalOpen" x-transition.opacity class="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 sm:items-center" @click.self="editColumnModalOpen = false; $wire.closeEditColumnModal()">
+            <section role="dialog" aria-modal="true" aria-labelledby="edit-column-title" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+                <div class="mb-6 flex items-start justify-between gap-4">
+                    <div>
+                        <h2 id="edit-column-title" class="text-lg font-semibold text-gray-900">Edit column</h2>
+                        <p class="mt-1 text-sm text-gray-500">Update the column name and accent color.</p>
+                    </div>
+                    <button type="button" wire:click="closeEditColumnModal" @click="editColumnModalOpen = false" class="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close dialog">×</button>
+                </div>
+
+                <form wire:submit="updateColumn">
+                    <div class="mb-5">
+                        <label for="edit-column-name" class="form-label">Column name</label>
+                        <input id="edit-column-name" type="text" wire:model="editColumnName" maxlength="255" required class="form-input" @error('editColumnName') aria-invalid="true" aria-describedby="edit-column-name-error" @enderror>
+                        @error('editColumnName')
+                            <p id="edit-column-name-error" class="form-error">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="mb-6">
+                        <label for="edit-column-color" class="form-label">Accent color</label>
+                        <div class="flex items-center gap-3">
+                            <input id="edit-column-color" type="color" wire:model="editColumnColor" class="size-12 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 shadow-sm">
+                            <p class="text-sm text-gray-500">This color marks the column beside its name.</p>
+                        </div>
+                        @error('editColumnColor')
+                            <p class="form-error">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button type="button" wire:click="closeEditColumnModal" @click="editColumnModalOpen = false" class="button-secondary">Cancel</button>
+                        <button type="submit" class="button-primary" wire:loading.attr="disabled" wire:target="updateColumn">
+                            <span wire:loading.remove wire:target="updateColumn">Save column</span>
+                            <span wire:loading wire:target="updateColumn">Saving...</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    @endif
+
+    @if ($deletingColumnId !== null)
+        <div x-cloak x-show="deleteColumnModalOpen" x-transition.opacity class="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-gray-950/50 p-4 sm:items-center" @click.self="deleteColumnModalOpen = false; deleteConfirmationInput = ''; $wire.closeDeleteColumnConfirmation()">
+            <section role="alertdialog" aria-modal="true" aria-labelledby="delete-column-title" aria-describedby="delete-column-description" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+                <div class="mb-5 flex items-start gap-4">
+                    <div class="flex size-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M10.3 3.9 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3l-7.5-13.1a2 2 0 0 0-3.4 0Z" />
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h2 id="delete-column-title" class="text-lg font-semibold text-gray-900">Delete this column?</h2>
+                        <p class="mt-1 text-sm text-gray-600">You are about to delete <span class="font-semibold text-gray-900" x-text="columnDeleteName"></span>.</p>
+                    </div>
+                </div>
+
+                <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/30">
+                    <p id="delete-column-description" class="text-sm leading-6 text-red-800 dark:text-red-200" x-text="`This will permanently delete this column and ${columnDeleteTaskCount} ${columnDeleteTaskCount === 1 ? 'task' : 'tasks'} in it. This action cannot be undone.`"></p>
+                </div>
+
+                <form wire:submit="deleteColumn">
+                    <div class="mb-6">
+                        <label for="column-delete-confirmation" class="form-label">Type <span class="font-mono font-semibold">confirm</span> to continue</label>
+                        <input id="column-delete-confirmation" type="text" wire:model="columnDeleteConfirmation" x-on:input="deleteConfirmationInput = $event.target.value" autocomplete="off" required class="form-input" @error('columnDeleteConfirmation') aria-invalid="true" aria-describedby="column-delete-confirmation-error" @enderror>
+                        @error('columnDeleteConfirmation')
+                            <p id="column-delete-confirmation-error" class="form-error">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button type="button" wire:click="closeDeleteColumnConfirmation" @click="deleteColumnModalOpen = false; deleteConfirmationInput = ''" class="button-secondary">Cancel</button>
+                        <button type="submit" x-bind:disabled="deleteConfirmationInput !== 'confirm'" class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-500/25 disabled:cursor-not-allowed disabled:opacity-50" wire:loading.attr="disabled" wire:target="deleteColumn">
+                            <span wire:loading.remove wire:target="deleteColumn">Delete column</span>
+                            <span wire:loading wire:target="deleteColumn">Deleting...</span>
                         </button>
                     </div>
                 </form>

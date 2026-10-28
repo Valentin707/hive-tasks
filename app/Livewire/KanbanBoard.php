@@ -32,6 +32,12 @@ class KanbanBoard extends Component
     #[Locked]
     public ?int $newColumnBoardId = null;
 
+    #[Locked]
+    public ?int $editingColumnId = null;
+
+    #[Locked]
+    public ?int $deletingColumnId = null;
+
     public string $taskTitle = '';
 
     public string $taskDescription = '';
@@ -41,6 +47,12 @@ class KanbanBoard extends Component
     public string $editTaskDescription = '';
 
     public string $newColumnName = '';
+
+    public string $editColumnName = '';
+
+    public string $editColumnColor = '#6366f1';
+
+    public string $columnDeleteConfirmation = '';
 
     public function mount(int $projectId, ?int $boardId = null): void
     {
@@ -178,6 +190,7 @@ class KanbanBoard extends Component
             $board->columns()->create([
                 'name' => $validated['newColumnName'],
                 'position' => $position,
+                'color' => '#6366f1',
             ]);
         }, 3);
 
@@ -191,6 +204,96 @@ class KanbanBoard extends Component
     {
         $this->newColumnBoardId = null;
         $this->newColumnName = '';
+        $this->resetValidation();
+    }
+
+    public function openEditColumnModal(int $columnId): void
+    {
+        abort_if($columnId < 1, 422);
+
+        $column = $this->activeColumns()->whereKey($columnId)->firstOrFail();
+
+        $this->editingColumnId = (int) $column->getKey();
+        $this->editColumnName = $column->name;
+        $this->editColumnColor = $column->color;
+        $this->resetValidation();
+        $this->dispatch('column-edit-opened');
+    }
+
+    public function updateColumn(): void
+    {
+        abort_if($this->editingColumnId === null, 404);
+
+        $validated = $this->validate([
+            'editColumnName' => ['required', 'string', 'max:255'],
+            'editColumnColor' => ['required', 'string', 'regex:/\A#[0-9a-fA-F]{6}\z/'],
+        ], ['editColumnColor.regex' => 'Choose a valid accent color.'], ['editColumnColor' => 'accent color']);
+
+        $column = $this->activeColumns()->whereKey($this->editingColumnId)->firstOrFail();
+        $column->name = $validated['editColumnName'];
+        $column->color = $validated['editColumnColor'];
+        $column->save();
+
+        $columnId = (int) $column->getKey();
+        $columnName = $column->name;
+        $columnColor = $column->color;
+
+        $this->closeEditColumnModal();
+        $this->dispatch('column-updated', columnId: $columnId, columnName: $columnName, columnColor: $columnColor);
+    }
+
+    public function closeEditColumnModal(): void
+    {
+        $this->editingColumnId = null;
+        $this->reset(['editColumnName']);
+        $this->editColumnColor = '#6366f1';
+        $this->resetValidation();
+    }
+
+    public function openDeleteColumnConfirmation(int $columnId): void
+    {
+        abort_if($columnId < 1, 422);
+
+        $column = $this->activeColumns()
+            ->withCount('tasks')
+            ->whereKey($columnId)
+            ->firstOrFail();
+
+        $this->deletingColumnId = (int) $column->getKey();
+        $this->columnDeleteConfirmation = '';
+        $this->resetValidation();
+        $this->dispatch('column-delete-opened', columnName: $column->name, taskCount: (int) $column->tasks_count);
+    }
+
+    public function deleteColumn(): void
+    {
+        abort_if($this->deletingColumnId === null, 404);
+
+        $this->validate(
+            ['columnDeleteConfirmation' => ['required', 'string', 'in:confirm']],
+            ['columnDeleteConfirmation.in' => 'Type confirm exactly to delete this column.'],
+            ['columnDeleteConfirmation' => 'confirmation'],
+        );
+
+        $columnId = $this->deletingColumnId;
+
+        DB::transaction(function () use ($columnId): void {
+            $column = $this->activeColumns()
+                ->whereKey($columnId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $column->delete();
+        }, 3);
+
+        $this->closeDeleteColumnConfirmation();
+        $this->dispatch('column-deleted', columnId: $columnId);
+    }
+
+    public function closeDeleteColumnConfirmation(): void
+    {
+        $this->deletingColumnId = null;
+        $this->columnDeleteConfirmation = '';
         $this->resetValidation();
     }
 

@@ -13,7 +13,7 @@ class Column extends Model
 {
     use HasTenantScope;
 
-    protected $fillable = ['board_id', 'name', 'position'];
+    protected $fillable = ['board_id', 'name', 'position', 'color'];
 
     public function board(): BelongsTo
     {
