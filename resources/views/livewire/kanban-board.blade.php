@@ -1,21 +1,41 @@
-<div data-kanban-board x-data="{ taskEditModalOpen: false }" x-on:task-edit-opened.window="taskEditModalOpen = true" x-on:task-updated.window="taskEditModalOpen = false" x-on:keydown.escape.window="if (taskEditModalOpen) { taskEditModalOpen = false; $wire.closeTaskEditModal() }">
+<div
+    data-kanban-board
+    x-data="{ taskEditModalOpen: false, createColumnModalOpen: false }"
+    x-on:task-edit-opened.window="taskEditModalOpen = true"
+    x-on:task-updated.window="taskEditModalOpen = false"
+    x-on:column-create-opened.window="createColumnModalOpen = true"
+    x-on:column-created.window="createColumnModalOpen = false"
+    x-on:keydown.escape.window="if (taskEditModalOpen) { taskEditModalOpen = false; $wire.closeTaskEditModal() } if (createColumnModalOpen) { createColumnModalOpen = false; $wire.closeCreateColumnModal() }"
+>
     <div class="space-y-10">
         @forelse ($project->boards as $board)
             <section wire:key="kanban-board-{{ $board->id }}" data-kanban-board-section data-board-id="{{ $board->id }}" x-data="{ reorderMode: false }" x-bind:data-column-reorder-mode="reorderMode ? 'true' : 'false'" x-on:column-reorder-start="reorderMode = true" x-on:column-reorder-end="reorderMode = false" aria-labelledby="board-{{ $board->id }}-title">
-                <div class="mb-4 flex items-center justify-between">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <h2 id="board-{{ $board->id }}-title" class="text-base font-semibold text-gray-900">{{ $board->name }}</h2>
                     <div class="flex items-center gap-3">
                         <p x-cloak x-show="reorderMode" class="text-xs text-gray-500">Release the handle to finish</p>
+                        <button
+                            type="button"
+                            wire:click="openCreateColumnModal({{ $board->id }})"
+                            wire:loading.attr="disabled"
+                            wire:target="openCreateColumnModal"
+                            class="button-secondary gap-1.5 px-3 py-1.5 text-xs sm:text-sm"
+                        >
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path stroke-linecap="round" d="M12 5v14M5 12h14" />
+                            </svg>
+                            Add column
+                        </button>
                         <span class="text-sm text-gray-500" data-board-task-count>{{ $board->columns->sum(fn ($column) => $column->tasks->count()) }} tasks</span>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 items-start gap-5 sm:grid-cols-2 xl:grid-cols-4" data-kanban-columns>
+                <div class="kanban-columns flex items-stretch gap-5 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-3 touch-pan-x" data-kanban-columns>
                     @foreach ($board->columns as $column)
-                        <section wire:key="kanban-column-{{ $column->id }}" data-kanban-column-wrapper data-column-id="{{ $column->id }}" class="min-w-0 rounded-xl border border-gray-200 bg-gray-100/70 p-3.5 shadow-sm transition duration-150" x-bind:class="reorderMode ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md' : ''" aria-labelledby="column-{{ $column->id }}-title">
+                        <section wire:key="kanban-column-{{ $column->id }}" data-kanban-column-wrapper data-column-id="{{ $column->id }}" class="flex h-full w-[min(20rem,calc(100vw-2rem))] shrink-0 flex-col rounded-xl border border-gray-200 bg-gray-100/70 p-3.5 shadow-sm transition duration-150" x-bind:class="reorderMode ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md' : ''" aria-labelledby="column-{{ $column->id }}-title">
                             <div class="mb-3 flex items-center justify-between gap-2 px-1">
                                 <div class="flex min-w-0 items-center gap-2.5">
-                                    <span class="size-2 shrink-0 rounded-full bg-indigo-500"></span>
+                                    <span class="size-2 shrink-0 rounded-full" style="background-color: hsl({{ ((int) $column->getKey() * 137) % 360 }} 72% 50%)"></span>
                                     <h3 id="column-{{ $column->id }}-title" class="truncate text-sm font-semibold text-gray-800">{{ $column->name }}</h3>
                                     <span class="rounded-md bg-white px-1.5 py-0.5 text-xs font-medium text-gray-500 ring-1 ring-inset ring-gray-200" data-column-task-count>{{ $column->tasks->count() }}</span>
                                 </div>
@@ -34,7 +54,7 @@
                                 </button>
                             </div>
 
-                            <div wire:ignore wire:key="kanban-column-dropzone-{{ $column->id }}" class="min-h-24 space-y-3 rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
+                            <div wire:ignore wire:key="kanban-column-dropzone-{{ $column->id }}" class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
                                 @foreach ($column->tasks as $task)
                                     <article class="draggable relative cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
                                         <button type="button" data-task-edit-button data-task-id="{{ $task->id }}" aria-label="Open task: {{ $task->title }}" class="block w-full rounded pr-10 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
@@ -131,6 +151,38 @@
             </div>
         @endforelse
     </div>
+
+    @if ($newColumnBoardId !== null)
+        <div x-cloak x-show="createColumnModalOpen" x-transition.opacity class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 sm:items-center" @click.self="createColumnModalOpen = false; $wire.closeCreateColumnModal()">
+            <section role="dialog" aria-modal="true" aria-labelledby="new-column-title" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+                <div class="mb-6 flex items-start justify-between gap-4">
+                    <div>
+                        <h2 id="new-column-title" class="text-lg font-semibold text-gray-900">Add a column</h2>
+                        <p class="mt-1 text-sm text-gray-500">Name the new column for this board.</p>
+                    </div>
+                    <button type="button" wire:click="closeCreateColumnModal" @click="createColumnModalOpen = false" class="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close dialog">×</button>
+                </div>
+
+                <form wire:submit="createColumn">
+                    <div class="mb-6">
+                        <label for="new-column-name" class="form-label">Column name</label>
+                        <input id="new-column-name" type="text" wire:model="newColumnName" maxlength="255" required autofocus class="form-input" @error('newColumnName') aria-invalid="true" aria-describedby="new-column-name-error" @enderror>
+                        @error('newColumnName')
+                            <p id="new-column-name-error" class="form-error">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button type="button" wire:click="closeCreateColumnModal" @click="createColumnModalOpen = false" class="button-secondary">Cancel</button>
+                        <button type="submit" class="button-primary" wire:loading.attr="disabled" wire:target="createColumn">
+                            <span wire:loading.remove wire:target="createColumn">Add column</span>
+                            <span wire:loading wire:target="createColumn">Adding...</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    @endif
 
     @if ($editingTaskId !== null)
         <div x-cloak x-show="taskEditModalOpen" x-transition.opacity class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 sm:items-center" @click.self="taskEditModalOpen = false; $wire.closeTaskEditModal()">

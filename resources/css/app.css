@@ -54,6 +54,49 @@
 }
 
 @layer components {
+    .kanban-columns {
+        height: max(16rem, calc(100dvh - 18rem));
+        cursor: grab;
+        scrollbar-color: var(--color-gray-400) var(--color-gray-100);
+        scrollbar-width: thin;
+    }
+
+    .kanban-columns.is-dragging {
+        cursor: grabbing;
+        user-select: none;
+    }
+
+    .kanban-columns::-webkit-scrollbar {
+        height: 0.4rem;
+    }
+
+    .kanban-columns::-webkit-scrollbar-track,
+    [data-kanban-column]::-webkit-scrollbar-track {
+        border-radius: 9999px;
+        background-color: var(--color-gray-100);
+    }
+
+    .kanban-columns::-webkit-scrollbar-thumb,
+    [data-kanban-column]::-webkit-scrollbar-thumb {
+        border: 1px solid var(--color-gray-100);
+        border-radius: 9999px;
+        background-color: var(--color-gray-400);
+    }
+
+    .kanban-columns::-webkit-scrollbar-thumb:hover,
+    [data-kanban-column]::-webkit-scrollbar-thumb:hover {
+        background-color: var(--color-gray-500);
+    }
+
+    [data-kanban-column] {
+        scrollbar-color: var(--color-gray-400) var(--color-gray-100);
+        scrollbar-width: thin;
+    }
+
+    [data-kanban-column]::-webkit-scrollbar {
+        width: 0.4rem;
+    }
+
     .form-label {
         @apply mb-1.5 block text-sm font-medium text-gray-700;
     }
@@ -76,6 +119,12 @@
 
     .button-secondary {
         @apply inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition duration-150 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-gray-400/20 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+}
+
+@media (min-width: 64rem) {
+    .kanban-columns {
+        height: max(20rem, calc(100dvh - 19rem));
     }
 }
 

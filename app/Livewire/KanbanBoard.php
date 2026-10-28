@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Models\Board;
 use App\Models\Column;
 use App\Models\Project;
 use App\Models\Task;
@@ -28,6 +29,9 @@ class KanbanBoard extends Component
     #[Locked]
     public ?int $editingTaskId = null;
 
+    #[Locked]
+    public ?int $newColumnBoardId = null;
+
     public string $taskTitle = '';
 
     public string $taskDescription = '';
@@ -35,6 +39,8 @@ class KanbanBoard extends Component
     public string $editTaskTitle = '';
 
     public string $editTaskDescription = '';
+
+    public string $newColumnName = '';
 
     public function mount(int $projectId, ?int $boardId = null): void
     {
@@ -138,6 +144,53 @@ class KanbanBoard extends Component
     {
         $this->editingTaskId = null;
         $this->reset(['editTaskTitle', 'editTaskDescription']);
+        $this->resetValidation();
+    }
+
+    public function openCreateColumnModal(int $boardId): void
+    {
+        abort_if($boardId < 1, 422);
+
+        $this->activeBoards()->whereKey($boardId)->firstOrFail();
+
+        $this->newColumnBoardId = $boardId;
+        $this->newColumnName = '';
+        $this->resetValidation();
+        $this->dispatch('column-create-opened');
+    }
+
+    public function createColumn(): void
+    {
+        abort_if($this->newColumnBoardId === null, 404);
+
+        $validated = $this->validate([
+            'newColumnName' => ['required', 'string', 'max:255'],
+        ]);
+
+        DB::transaction(function () use ($validated): void {
+            $board = $this->activeBoards()
+                ->whereKey($this->newColumnBoardId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $position = (int) $board->columns()->max('position') + 1;
+
+            $board->columns()->create([
+                'name' => $validated['newColumnName'],
+                'position' => $position,
+            ]);
+        }, 3);
+
+        $this->newColumnBoardId = null;
+        $this->newColumnName = '';
+        $this->resetValidation();
+        $this->dispatch('column-created');
+    }
+
+    public function closeCreateColumnModal(): void
+    {
+        $this->newColumnBoardId = null;
+        $this->newColumnName = '';
         $this->resetValidation();
     }
 
@@ -295,6 +348,13 @@ class KanbanBoard extends Component
         return Column::query()->whereHas('board', fn (Builder $query) => $query
             ->where('project_id', $this->projectId)
             ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId)));
+    }
+
+    private function activeBoards(): Builder
+    {
+        return Board::query()
+            ->where('project_id', $this->projectId)
+            ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId));
     }
 
     private function activeTasks(): Builder

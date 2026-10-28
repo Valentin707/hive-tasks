@@ -3,6 +3,103 @@ import './quill-rich-text-editor.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dragDropManagers = new WeakMap();
+    const columnScrollers = new WeakSet();
+
+    const initializeColumnScroller = (strip) => {
+        if (columnScrollers.has(strip)) {
+            return;
+        }
+
+        columnScrollers.add(strip);
+
+        let pointerState = null;
+        let suppressClick = false;
+
+        const finishPointerScroll = (event, allowClickSuppression = false) => {
+            if (!pointerState || pointerState.pointerId !== event.pointerId) {
+                return;
+            }
+
+            const didScroll = pointerState.didScroll;
+            pointerState = null;
+            strip.classList.remove('is-dragging');
+
+            if (allowClickSuppression && didScroll) {
+                suppressClick = true;
+                window.setTimeout(() => {
+                    suppressClick = false;
+                }, 0);
+            }
+
+            if (strip.hasPointerCapture(event.pointerId)) {
+                strip.releasePointerCapture(event.pointerId);
+            }
+        };
+
+        strip.addEventListener('pointerdown', (event) => {
+            if (event.pointerType !== 'mouse' || event.button !== 0 || pointerState !== null) {
+                return;
+            }
+
+            const target = event.target instanceof Element ? event.target : null;
+
+            if (!target || target.closest('button, a, input, select, textarea, [contenteditable="true"], [data-item-id], [data-column-drag-handle]')) {
+                return;
+            }
+
+            const stripBounds = strip.getBoundingClientRect();
+            const taskList = target.closest('[data-kanban-column]');
+
+            if (event.clientY >= stripBounds.bottom - 14) {
+                return;
+            }
+
+            if (taskList && event.clientX >= taskList.getBoundingClientRect().right - 14) {
+                return;
+            }
+
+            pointerState = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                startScrollLeft: strip.scrollLeft,
+                didScroll: false,
+            };
+
+            strip.setPointerCapture(event.pointerId);
+        });
+
+        strip.addEventListener('pointermove', (event) => {
+            if (!pointerState || pointerState.pointerId !== event.pointerId) {
+                return;
+            }
+
+            const distanceX = event.clientX - pointerState.startX;
+            const distanceY = event.clientY - pointerState.startY;
+
+            if (!pointerState.didScroll && (Math.abs(distanceX) < 6 || Math.abs(distanceX) <= Math.abs(distanceY))) {
+                return;
+            }
+
+            pointerState.didScroll = true;
+            strip.classList.add('is-dragging');
+            strip.scrollLeft = pointerState.startScrollLeft - distanceX;
+            event.preventDefault();
+        });
+
+        strip.addEventListener('pointerup', (event) => finishPointerScroll(event, true));
+        strip.addEventListener('pointercancel', (event) => finishPointerScroll(event));
+        strip.addEventListener('lostpointercapture', (event) => finishPointerScroll(event));
+        strip.addEventListener('click', (event) => {
+            if (!suppressClick) {
+                return;
+            }
+
+            suppressClick = false;
+            event.preventDefault();
+            event.stopPropagation();
+        }, true);
+    };
 
     const liveDate = document.querySelector('[data-live-date]');
     const liveClock = document.querySelector('[data-live-clock]');
@@ -103,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dragDropManager.enableDropzone(board.querySelectorAll('[data-kanban-column]'));
         dragDropManagers.set(board, dragDropManager);
+        board.querySelectorAll('[data-kanban-columns]').forEach(initializeColumnScroller);
 
         let columnDragState = null;
 
@@ -247,8 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, { column: columns[0], distance: Number.POSITIVE_INFINITY }).column;
 
             const rect = target.getBoundingClientRect();
-            const gridColumnCount = getComputedStyle(state.container).gridTemplateColumns.split(' ').length;
-            const useHorizontalAxis = gridColumnCount > 1;
+            const useHorizontalAxis = getComputedStyle(state.container).flexDirection === 'row';
             const insertAfter = useHorizontalAxis
                 ? event.clientX > rect.left + rect.width / 2
                 : event.clientY > rect.top + rect.height / 2;
@@ -281,6 +378,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     new MutationObserver((records) => {
+        const addedColumnStrips = new Set(records
+            .flatMap((record) => [...record.addedNodes])
+            .filter((node) => node instanceof Element)
+            .flatMap((node) => [
+                ...(node.matches('[data-kanban-columns]') ? [node] : []),
+                ...node.querySelectorAll('[data-kanban-columns]'),
+            ]));
+
+        addedColumnStrips.forEach(initializeColumnScroller);
+
+        const addedDropzones = new Set(records
+            .flatMap((record) => [...record.addedNodes])
+            .filter((node) => node instanceof Element)
+            .flatMap((node) => [
+                ...(node.matches('[data-kanban-column]') ? [node] : []),
+                ...node.querySelectorAll('[data-kanban-column]'),
+            ]));
+
+        addedDropzones.forEach((dropzone) => {
+            const board = dropzone.closest('[data-kanban-board]');
+
+            if (board) {
+                dragDropManagers.get(board)?.enableDropzone([dropzone]);
+            }
+        });
+
         records.flatMap((record) => [...record.removedNodes]).forEach((node) => {
             if (!(node instanceof Element)) {
                 return;
