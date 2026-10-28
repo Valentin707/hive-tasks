@@ -123,6 +123,17 @@ class KanbanBoard extends Component
         $this->dispatch('task-updated', taskId: $taskId, title: $title);
     }
 
+    public function deleteTask(int $taskId): void
+    {
+        abort_if($taskId < 1, 422);
+
+        $task = $this->activeTasks()->whereKey($taskId)->firstOrFail();
+        $columnId = (int) $task->column_id;
+        $task->delete();
+
+        $this->dispatch('task-deleted', taskId: $taskId, columnId: $columnId);
+    }
+
     public function closeTaskEditModal(): void
     {
         $this->editingTaskId = null;

@@ -36,10 +36,24 @@
 
                             <div wire:ignore wire:key="kanban-column-dropzone-{{ $column->id }}" class="min-h-24 space-y-3 rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
                                 @foreach ($column->tasks as $task)
-                                    <article class="draggable cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
-                                        <button type="button" data-task-edit-button data-task-id="{{ $task->id }}" aria-label="Open task: {{ $task->title }}" class="block w-full rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                                    <article class="draggable relative cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
+                                        <button type="button" data-task-edit-button data-task-id="{{ $task->id }}" aria-label="Open task: {{ $task->title }}" class="block w-full rounded pr-10 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                                             <span data-task-title class="block text-sm font-medium leading-5 text-gray-800">{{ $task->title }}</span>
                                             <time datetime="{{ $task->created_at->toIso8601String() }}" data-task-created-at class="mt-2 block text-xs text-gray-500">Created {{ $task->created_at->format('M j, Y') }}</time>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            data-task-delete-button
+                                            data-task-id="{{ $task->id }}"
+                                            data-task-title="{{ $task->title }}"
+                                            draggable="false"
+                                            aria-label="Delete task: {{ $task->title }}"
+                                            title="Delete task"
+                                            class="absolute right-2 top-2 inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/70"
+                                        >
+                                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                                            </svg>
                                         </button>
                                     </article>
                                 @endforeach
@@ -213,7 +227,33 @@
             });
 
             $wire.$el.addEventListener('click', (event) => {
-                const editButton = event.target instanceof Element
+                const clickedElement = event.target instanceof Element ? event.target : null;
+                const deleteButton = clickedElement
+                    ? clickedElement.closest('[data-task-delete-button]')
+                    : null;
+
+                if (deleteButton && $wire.$el.contains(deleteButton)) {
+                    const taskId = Number(deleteButton.dataset.taskId);
+                    const taskTitle = deleteButton.dataset.taskTitle || 'this task';
+
+                    if (
+                        Number.isSafeInteger(taskId)
+                        && taskId > 0
+                        && window.confirm(`Delete "${taskTitle}"? This action cannot be undone.`)
+                    ) {
+                        deleteButton.disabled = true;
+
+                        $wire.deleteTask(taskId).catch(() => {
+                            if (deleteButton.isConnected) {
+                                deleteButton.disabled = false;
+                            }
+                        });
+                    }
+
+                    return;
+                }
+
+                const editButton = clickedElement
                     ? event.target.closest('[data-task-edit-button]')
                     : null;
 
@@ -240,6 +280,26 @@
 
                 title.textContent = event.detail.title;
                 title.closest('[data-task-edit-button]')?.setAttribute('aria-label', `Open task: ${event.detail.title}`);
+
+                const deleteButton = card.querySelector('[data-task-delete-button]');
+
+                if (deleteButton) {
+                    deleteButton.dataset.taskTitle = event.detail.title;
+                    deleteButton.setAttribute('aria-label', `Delete task: ${event.detail.title}`);
+                }
+            });
+
+            $wire.$el.addEventListener('task-deleted', (event) => {
+                const taskId = Number(event.detail.taskId);
+                const card = [...$wire.$el.querySelectorAll('[data-item-id]')]
+                    .find((item) => item.dataset.itemId === String(taskId));
+
+                if (!Number.isSafeInteger(taskId) || taskId < 1 || !card) {
+                    return;
+                }
+
+                card.remove();
+                syncBoardCountsAndEmptyStates();
             });
 
             $wire.$el.addEventListener('column-reordered', (event) => {
@@ -296,7 +356,7 @@
                 }
 
                 const card = document.createElement('article');
-                card.className = 'draggable cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing';
+                card.className = 'draggable relative cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing';
                 card.dataset.itemId = String(task.id);
 
                 const editButton = document.createElement('button');
@@ -304,7 +364,7 @@
                 editButton.dataset.taskEditButton = '';
                 editButton.dataset.taskId = String(task.id);
                 editButton.setAttribute('aria-label', `Open task: ${task.title}`);
-                editButton.className = 'block w-full rounded text-left focus:outline-none focus:ring-2 focus:ring-indigo-500';
+                editButton.className = 'block w-full rounded pr-10 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500';
 
                 const title = document.createElement('span');
                 title.dataset.taskTitle = '';
@@ -319,7 +379,18 @@
                 createdAt.textContent = `Created ${task.createdAtLabel}`;
                 editButton.append(createdAt);
 
-                card.append(editButton);
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.dataset.taskDeleteButton = '';
+                deleteButton.dataset.taskId = String(task.id);
+                deleteButton.dataset.taskTitle = task.title;
+                deleteButton.draggable = false;
+                deleteButton.setAttribute('aria-label', `Delete task: ${task.title}`);
+                deleteButton.title = 'Delete task';
+                deleteButton.className = 'absolute right-2 top-2 inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/70';
+                deleteButton.innerHTML = '<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>';
+
+                card.append(editButton, deleteButton);
 
                 const emptyState = column.querySelector('[data-column-empty-state]');
 
