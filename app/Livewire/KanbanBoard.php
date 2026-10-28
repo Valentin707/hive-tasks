@@ -49,6 +49,7 @@ class KanbanBoard extends Component
         $this->taskColumnId = $columnId;
         $this->reset(['taskTitle', 'taskDescription']);
         $this->resetValidation();
+        $this->dispatch('task-create-opened', columnId: $columnId);
     }
 
     public function createTask(): void
@@ -71,7 +72,7 @@ class KanbanBoard extends Component
 
             return $column->tasks()->create([
                 'title' => $validated['taskTitle'],
-                'description' => $validated['taskDescription'] ?: null,
+                'description' => RichTextSanitizer::sanitize($validated['taskDescription'] ?? '') ?: null,
                 'position' => $position,
             ]);
         }, 3);
@@ -112,7 +113,7 @@ class KanbanBoard extends Component
 
         $task = $this->activeTasks()->whereKey($this->editingTaskId)->firstOrFail();
         $task->title = $validated['editTaskTitle'];
-        $task->description = $validated['editTaskDescription'] ?: null;
+        $task->description = RichTextSanitizer::sanitize($validated['editTaskDescription'] ?? '') ?: null;
         $task->save();
 
         $taskId = (int) $task->getKey();
@@ -272,7 +273,10 @@ class KanbanBoard extends Component
 
         abort_if($this->boardId !== null && $project->boards->isEmpty(), 404);
 
-        return view('livewire.kanban-board', compact('project'));
+        $taskDescriptionHtml = RichTextSanitizer::sanitize($this->taskDescription);
+        $editTaskDescriptionHtml = RichTextSanitizer::sanitize($this->editTaskDescription);
+
+        return view('livewire.kanban-board', compact('project', 'taskDescriptionHtml', 'editTaskDescriptionHtml'));
     }
 
     private function activeColumns(): Builder

@@ -77,8 +77,19 @@
                                             </div>
 
                                             <div class="mb-6">
-                                                <label for="task-description-{{ $column->id }}" class="form-label">Description <span class="font-normal text-gray-400">(optional)</span></label>
-                                                <textarea id="task-description-{{ $column->id }}" wire:model="taskDescription" rows="4" maxlength="10000" class="form-input resize-y" @error('taskDescription') aria-invalid="true" aria-describedby="task-description-error-{{ $column->id }}" @enderror></textarea>
+                                                <p class="form-label">Description <span class="font-normal text-gray-400">(optional)</span></p>
+                                                <div
+                                                    x-data="quillRichTextEditor({ placeholder: 'Add task details...', ariaLabel: 'Task description', minHeight: '10rem' })"
+                                                    x-init="$nextTick(() => initialize())"
+                                                    x-on:task-create-opened.window="if (Number($event.detail.columnId) === {{ $column->id }}) clear()"
+                                                    x-on:task-created.window="if (Number($event.detail.columnId) === {{ $column->id }}) clear()"
+                                                >
+                                                    <div class="quill-rich-text-editor" wire:ignore>
+                                                        <div x-ref="editor"></div>
+                                                    </div>
+                                                    <textarea x-ref="contentInput" wire:model="taskDescription" aria-hidden="true" tabindex="-1" class="hidden">{{ $taskDescription }}</textarea>
+                                                    <textarea x-ref="initialHtml" aria-hidden="true" tabindex="-1" class="hidden">{{ $taskDescriptionHtml }}</textarea>
+                                                </div>
                                                 @error('taskDescription')
                                                     <p id="task-description-error-{{ $column->id }}" class="form-error">{{ $message }}</p>
                                                 @enderror
@@ -128,8 +139,18 @@
                     </div>
 
                     <div class="mb-6">
-                        <label for="edit-task-description" class="form-label">Description <span class="font-normal text-gray-400">(optional)</span></label>
-                        <textarea id="edit-task-description" wire:model="editTaskDescription" rows="5" maxlength="10000" class="form-input resize-y" @error('editTaskDescription') aria-invalid="true" aria-describedby="edit-task-description-error" @enderror></textarea>
+                        <p class="form-label">Description <span class="font-normal text-gray-400">(optional)</span></p>
+                        <div
+                            wire:key="task-description-editor-{{ $editingTaskId }}"
+                            x-data="quillRichTextEditor({ placeholder: 'Add task details...', ariaLabel: 'Task description', minHeight: '12rem' })"
+                            x-init="$nextTick(() => initialize())"
+                        >
+                            <div class="quill-rich-text-editor" wire:ignore>
+                                <div x-ref="editor"></div>
+                            </div>
+                            <textarea x-ref="contentInput" wire:model="editTaskDescription" aria-hidden="true" tabindex="-1" class="hidden">{{ $editTaskDescription }}</textarea>
+                            <textarea x-ref="initialHtml" aria-hidden="true" tabindex="-1" class="hidden">{{ $editTaskDescriptionHtml }}</textarea>
+                        </div>
                         @error('editTaskDescription')
                             <p id="edit-task-description-error" class="form-error">{{ $message }}</p>
                         @enderror
