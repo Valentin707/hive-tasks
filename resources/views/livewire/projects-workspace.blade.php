@@ -1,4 +1,9 @@
-<section>
+<section
+    x-data="{ deleteProjectModalOpen: false, projectDeleteConfirmationText: '', projectDeleteConfirmationInput: '', projectDeleteBoardCount: 0, projectDeleteColumnCount: 0, projectDeleteTaskCount: 0 }"
+    x-on:project-delete-opened.window="deleteProjectModalOpen = true; projectDeleteConfirmationText = $event.detail.confirmationText; projectDeleteBoardCount = Number($event.detail.boardCount); projectDeleteColumnCount = Number($event.detail.columnCount); projectDeleteTaskCount = Number($event.detail.taskCount); projectDeleteConfirmationInput = ''"
+    x-on:project-deleted.window="deleteProjectModalOpen = false; projectDeleteConfirmationText = ''; projectDeleteConfirmationInput = ''; projectDeleteBoardCount = 0; projectDeleteColumnCount = 0; projectDeleteTaskCount = 0"
+    x-on:keydown.escape.window="if (deleteProjectModalOpen) { deleteProjectModalOpen = false; projectDeleteConfirmationInput = ''; $wire.closeDeleteProjectConfirmation() }"
+>
     <div class="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <p class="mb-2 text-sm font-medium text-indigo-600">Workspace</p>
@@ -78,8 +83,23 @@
             @foreach ($projects as $project)
                 <section wire:key="project-{{ $project->id }}" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="project-{{ $project->id }}-title">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <h2 id="project-{{ $project->id }}-title" class="truncate text-lg font-semibold text-gray-900">{{ $project->name }}</h2>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-start justify-between gap-3">
+                                <h2 id="project-{{ $project->id }}-title" class="truncate text-lg font-semibold text-gray-900">{{ $project->name }}</h2>
+                                <button
+                                    type="button"
+                                    wire:click="openDeleteProjectConfirmation({{ $project->id }})"
+                                    wire:loading.attr="disabled"
+                                    wire:target="openDeleteProjectConfirmation"
+                                    aria-label="Delete project: {{ $project->name }}"
+                                    title="Delete project"
+                                    class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/70"
+                                >
+                                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                                    </svg>
+                                </button>
+                            </div>
                             <p class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
                                 <time datetime="{{ $project->created_at->toDateString() }}">Created {{ $project->created_at->format('M j, Y') }}</time>
                                 <span aria-hidden="true">·</span>
@@ -125,6 +145,51 @@
             </div>
             <h2 class="mt-4 text-sm font-semibold text-gray-900">{{ trim($search) === '' ? 'No projects yet' : 'No matching projects' }}</h2>
             <p class="mt-1 text-sm text-gray-500">{{ trim($search) === '' ? 'Create a project to start organizing your work.' : 'Try another project name.' }}</p>
+        </div>
+    @endif
+
+    @if ($deletingProjectId !== null)
+        <div x-cloak x-show="deleteProjectModalOpen" x-transition.opacity class="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-gray-950/50 p-4 sm:items-center" @click.self="deleteProjectModalOpen = false; projectDeleteConfirmationInput = ''; $wire.closeDeleteProjectConfirmation()">
+            <section role="alertdialog" aria-modal="true" aria-labelledby="delete-project-title" aria-describedby="delete-project-description" class="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+                <div class="mb-5 flex items-start gap-4">
+                    <div class="flex size-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M10.3 3.9 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3l-7.5-13.1a2 2 0 0 0-3.4 0Z" />
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h2 id="delete-project-title" class="text-lg font-semibold text-gray-900">Delete this project?</h2>
+                        <p class="mt-1 text-sm text-gray-600">You are about to permanently delete "<span class="font-semibold text-gray-900" x-text="projectDeleteConfirmationText"></span>".</p>
+                    </div>
+                </div>
+
+                <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/30">
+                    <p id="delete-project-description" class="text-sm leading-6 text-red-800 dark:text-red-200">This action cannot be undone. The project and all of its boards, columns, and tasks will be permanently removed.</p>
+                    <ul class="mt-3 space-y-1.5 text-sm font-medium text-red-800 dark:text-red-200">
+                        <li class="flex items-center justify-between gap-4"><span>Boards</span><span x-text="projectDeleteBoardCount"></span></li>
+                        <li class="flex items-center justify-between gap-4"><span>Columns</span><span x-text="projectDeleteColumnCount"></span></li>
+                        <li class="flex items-center justify-between gap-4"><span>Tasks</span><span x-text="projectDeleteTaskCount"></span></li>
+                    </ul>
+                </div>
+
+                <form wire:submit="deleteProject">
+                    <div class="mb-6">
+                        <label for="project-delete-confirmation" class="form-label">Type "<span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono font-semibold text-gray-900 dark:bg-gray-800 dark:text-gray-100" x-text="projectDeleteConfirmationText"></span>" to confirm</label>
+                        <input id="project-delete-confirmation" type="text" wire:model="projectDeleteConfirmation" x-on:input="projectDeleteConfirmationInput = $event.target.value" autocomplete="off" required autofocus class="form-input" @error('projectDeleteConfirmation') aria-invalid="true" aria-describedby="project-delete-confirmation-error" @enderror>
+                        @error('projectDeleteConfirmation')
+                            <p id="project-delete-confirmation-error" class="form-error">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button type="button" wire:click="closeDeleteProjectConfirmation" @click="deleteProjectModalOpen = false; projectDeleteConfirmationInput = ''" class="button-secondary">Cancel</button>
+                        <button type="submit" x-bind:disabled="projectDeleteConfirmationInput !== projectDeleteConfirmationText" class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-500/25 disabled:cursor-not-allowed disabled:opacity-50" wire:loading.attr="disabled" wire:target="deleteProject">
+                            <span wire:loading.remove wire:target="deleteProject">Delete project</span>
+                            <span wire:loading wire:target="deleteProject">Deleting...</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
         </div>
     @endif
 </section>

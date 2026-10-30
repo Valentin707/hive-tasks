@@ -4,20 +4,29 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Models\Column;
 use App\Models\Project;
+use App\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ProjectsWorkspace extends Component
 {
+    #[Locked]
+    public ?int $deletingProjectId = null;
+
     public string $search = '';
 
     public string $name = '';
 
     public string $description = '';
+
+    public string $projectDeleteConfirmation = '';
 
     public function createProject(): void
     {
@@ -52,6 +61,66 @@ class ProjectsWorkspace extends Component
         $this->reset(['name', 'description', 'search']);
         $this->resetValidation();
         $this->dispatch('project-created');
+    }
+
+    public function openDeleteProjectConfirmation(int $projectId): void
+    {
+        abort_unless(auth()->check(), 401);
+        abort_if($projectId < 1, 422);
+
+        $project = Project::query()->whereKey($projectId)->firstOrFail();
+        $boardCount = $project->boards()->count();
+        $columnCount = Column::query()
+            ->whereHas('board', fn (Builder $query) => $query->where('project_id', $projectId))
+            ->count();
+        $taskCount = Task::query()
+            ->whereHas('column.board', fn (Builder $query) => $query->where('project_id', $projectId))
+            ->count();
+
+        $this->deletingProjectId = $projectId;
+        $this->projectDeleteConfirmation = '';
+        $this->resetValidation();
+        $this->dispatch(
+            'project-delete-opened',
+            confirmationText: $project->name,
+            boardCount: $boardCount,
+            columnCount: $columnCount,
+            taskCount: $taskCount,
+        );
+    }
+
+    public function deleteProject(): void
+    {
+        abort_unless(auth()->check(), 401);
+        abort_if($this->deletingProjectId === null, 404);
+
+        $projectId = $this->deletingProjectId;
+
+        DB::transaction(function () use ($projectId): void {
+            $project = Project::query()
+                ->whereKey($projectId)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $confirmationText = $project->name;
+
+            $this->validate(
+                ['projectDeleteConfirmation' => ['required', 'string', Rule::in([$confirmationText])]],
+                ['projectDeleteConfirmation.in' => 'Type the project name exactly as shown to confirm deletion.'],
+                ['projectDeleteConfirmation' => 'project name confirmation'],
+            );
+
+            $project->delete();
+        }, 3);
+
+        $this->closeDeleteProjectConfirmation();
+        $this->dispatch('project-deleted', projectId: $projectId);
+    }
+
+    public function closeDeleteProjectConfirmation(): void
+    {
+        $this->deletingProjectId = null;
+        $this->projectDeleteConfirmation = '';
+        $this->resetValidation();
     }
 
     public function render(): View
