@@ -1,58 +1,91 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# HiveTasks
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+HiveTasks is a project planning workspace for organizing work on flexible Kanban boards and keeping project notes together. Projects, boards, tasks, and notes are managed in one responsive interface, with light and dark themes.
 
-## About Laravel
+## Highlights
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Create projects with rich-text descriptions and open their boards from the project list.
+- Organize tasks across customizable Kanban columns. Add, edit, reorder, recolor, and delete columns; create, edit, and delete tasks.
+- Scroll wide boards horizontally, including by dragging across the board background.
+- Keep notes in a searchable list and edit their rich-text content with automatic saving.
+- Use the application on desktop or mobile, switch themes, and collapse the sidebar to make more room for the workspace.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Run locally
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Requirements
 
-## Learning Laravel
+- PHP 8.3 or later and Composer
+- Node.js and npm
+- SQLite support in PHP (or another database configured in `.env`)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Setup
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+From the project directory, run:
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer setup
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+This installs the PHP and JavaScript dependencies, creates the application key, runs database migrations, and builds the frontend assets. The example environment uses SQLite by default. If you use another database, configure its connection in `.env` before running the migrations.
 
-## Contributing
+Add sample presentation data, including a demo user and a sample project board:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan db:seed
+```
 
-## Code of Conduct
+Start the application and its development services:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+composer run dev
+```
 
-## Security Vulnerabilities
+Open [http://localhost:8000](http://localhost:8000) in your browser. Sign in with the seeded local demo account below, or choose **Register** to create an account:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Email | Password |
+| --- | --- |
+| `test@example.com` | `password` |
 
-## License
+This account is for local demonstrations only. Register a separate account for normal use.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## User guide
+
+### Projects and boards
+
+The **Projects** page is the workspace home. Each project card shows its title, creation date, task count, and links to its boards. Use **New Project** to create a project and add an optional rich-text description.
+
+Open a board from its project card. The project page separates the project description and Kanban board into tabs; the selected tab is kept in the page URL so it can be reopened directly. Edit the description from the description tab.
+
+On the board:
+
+1. Add a task to a column and enter its title and optional rich-text description.
+2. Select a task card to edit it, then save your changes in the task editor. Move cards between columns to reflect progress.
+3. Use the column controls to add a column, reorder columns, change a column's name or color, or delete it.
+4. Delete a task or column from its controls. Deletion prompts for confirmation; column deletion also removes its tasks.
+5. Drag across empty board space to scroll horizontally when columns extend beyond the viewport. The columns keep a readable width instead of shrinking.
+
+Deleting a project permanently deletes its boards, columns, and tasks. The confirmation dialog shows what will be removed and asks you to type the project name.
+
+### Notes
+
+Open **Notes** in the sidebar to create, search by title, and manage notes. Select a note to read it, or choose its edit action to change the title and rich-text content. Edits are saved automatically. Notes can also be deleted from the list.
+
+### Navigation and appearance
+
+- Use the top navigation button to collapse or reopen the sidebar. Its state is remembered while navigating between pages.
+- Open the account menu in the top navigation to access profile settings or log out.
+- Choose a light or dark theme in profile settings. The theme applies across the workspace.
+- On narrow screens, the project list and workspaces adapt to the available width; Kanban boards remain horizontally scrollable.
+
+## Suggested presentation flow
+
+1. Sign in with the seeded demo account and show the sample project list.
+2. Open the sample project, review its description, and switch to its board.
+3. Create a task, edit its rich-text description, then demonstrate adding or recoloring a column.
+4. Show horizontal board navigation and the confirmation flow for a destructive action.
+5. Open Notes, create a note, and show that editing is saved automatically.
+6. Finish by toggling the theme and collapsing the sidebar to demonstrate the responsive workspace.
+
+## Built with
+
+Laravel, Livewire, Alpine.js, Tailwind CSS, Vite, and Quill.
