@@ -17,7 +17,8 @@
         $pageTitle = trim(strip_tags($__env->yieldContent('title', config('app.name', 'HiveTasks'))));
         $pageSubtitle = match (true) {
             request()->routeIs('projects.board') => 'Kanban board',
-            request()->routeIs('projects.index', 'dashboard') => 'Project workspace',
+            request()->routeIs('dashboard') => 'Workspace overview',
+            request()->routeIs('projects.index') => 'Project workspace',
             request()->routeIs('notes.index') => 'Notes workspace',
             request()->routeIs('profile.index') => 'Account settings',
             default => 'Workspace',
@@ -106,6 +107,24 @@
 
             <nav class="flex-1 space-y-1 px-2 py-6" aria-label="Main navigation">
                 <a
+                    href="{{ route('dashboard') }}"
+                    title="Home Dashboard"
+                    aria-label="Home Dashboard"
+                    x-on:click="if (!desktopViewport) sidebarOpen = false"
+                    :class="sidebarOpen ? 'justify-start px-3' : 'justify-center px-2'"
+                    @class([
+                        'flex items-center gap-3 rounded-lg py-2.5 text-sm transition',
+                        'bg-indigo-50 font-semibold text-indigo-700 hover:bg-indigo-100' => request()->routeIs('dashboard'),
+                        'font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('dashboard'),
+                    ])
+                >
+                    <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m3.75 10.25 8.25-6.5 8.25 6.5M5.75 9.25v10h12.5v-10M9.25 19.25v-6.5h5.5v6.5" />
+                    </svg>
+                    <span x-cloak x-show="sidebarOpen" x-transition.opacity>Home Dashboard</span>
+                </a>
+
+                <a
                     href="{{ route('projects.index') }}"
                     title="Projects"
                     aria-label="Projects"
@@ -113,8 +132,8 @@
                     :class="sidebarOpen ? 'justify-start px-3' : 'justify-center px-2'"
                     @class([
                         'flex items-center gap-3 rounded-lg py-2.5 text-sm transition',
-                        'bg-indigo-50 font-semibold text-indigo-700 hover:bg-indigo-100' => request()->routeIs('dashboard', 'projects.*'),
-                        'font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('dashboard', 'projects.*'),
+                        'bg-indigo-50 font-semibold text-indigo-700 hover:bg-indigo-100' => request()->routeIs('projects.*'),
+                        'font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900' => ! request()->routeIs('projects.*'),
                     ])
                 >
                     <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">

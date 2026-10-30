@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotesController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WorkspaceController;
@@ -19,7 +20,8 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-    Route::get('/', [WorkspaceController::class, 'index'])->name('dashboard');
+    Route::redirect('/', '/dashboard')->name('home');
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/projects', [WorkspaceController::class, 'index'])->name('projects.index');
     Route::get('/projects/{project}/boards/{board}', [WorkspaceController::class, 'showBoard'])->name('projects.board');
     Route::get('/notes', [NotesController::class, 'index'])->name('notes.index');
