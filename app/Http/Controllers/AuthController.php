@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Role;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -74,7 +76,15 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:12', 'confirmed'],
         ]);
 
-        $user = User::query()->create($validated);
+        $user = DB::transaction(function () use ($validated): User {
+            $projectOwnerRole = Role::query()
+                ->where('slug', Role::PROJECT_OWNER_SLUG)
+                ->firstOrFail();
+            $user = User::query()->create($validated);
+            $user->roles()->attach($projectOwnerRole->getKey());
+
+            return $user;
+        });
 
         Auth::login($user);
         $request->session()->regenerate();

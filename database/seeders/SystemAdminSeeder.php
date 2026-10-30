@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Role;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -18,6 +19,15 @@ class SystemAdminSeeder extends Seeder
     public function run(): void
     {
         DB::transaction(function (): void {
+            $administratorRole = Role::query()->updateOrCreate(
+                ['slug' => Role::ADMIN_SLUG],
+                ['name' => 'Administrator'],
+            );
+            Role::query()->updateOrCreate(
+                ['slug' => Role::PROJECT_OWNER_SLUG],
+                ['name' => 'Project Owner'],
+            );
+
             $administrator = User::query()->firstOrNew([
                 'email' => 'admin@tasks.hive',
             ]);
@@ -35,8 +45,8 @@ class SystemAdminSeeder extends Seeder
                 $administrator->password = $password;
             }
 
-            $administrator->role = User::ROLE_ADMIN;
             $administrator->save();
+            $administrator->roles()->syncWithoutDetaching([$administratorRole->getKey()]);
 
             SystemSetting::query()->updateOrCreate(
                 ['key' => SystemSetting::REGISTRATION_ENABLED],

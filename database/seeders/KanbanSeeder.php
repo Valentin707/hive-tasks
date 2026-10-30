@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Role;
 use App\Models\User;
-use App\Models\Project;
 use Illuminate\Database\Seeder;
 
 class KanbanSeeder extends Seeder
@@ -19,6 +19,10 @@ class KanbanSeeder extends Seeder
             ['email' => 'test@example.com'],
             ['name' => 'Test User', 'password' => 'password'],
         );
+        $projectOwnerRole = Role::query()
+            ->where('slug', Role::PROJECT_OWNER_SLUG)
+            ->firstOrFail();
+        $user->roles()->syncWithoutDetaching([$projectOwnerRole->getKey()]);
 
         $project = $user->projects()->firstOrCreate(
             ['name' => 'My First Project'],
