@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,9 @@ class AuthController extends Controller
 {
     public function showLogin(): View
     {
-        return view('auth.login');
+        return view('auth.login', [
+            'registrationEnabled' => SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED),
+        ]);
     }
 
     public function login(Request $request): RedirectResponse
@@ -39,13 +42,30 @@ class AuthController extends Controller
         return redirect()->intended(route('dashboard'));
     }
 
-    public function showRegister(): View
+    public function showRegister(): View|RedirectResponse
     {
+        if (! SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED)) {
+            return redirect()->route('register.closed');
+        }
+
         return view('auth.register');
+    }
+
+    public function showRegistrationClosed(): View|RedirectResponse
+    {
+        if (SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED)) {
+            return redirect()->route('register');
+        }
+
+        return view('auth.registration-closed');
     }
 
     public function register(Request $request): RedirectResponse
     {
+        if (! SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED)) {
+            return redirect()->route('register.closed');
+        }
+
         $this->normalizeEmail($request);
 
         $validated = $request->validate([

@@ -17,8 +17,17 @@ use Illuminate\Notifications\Notifiable;
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
+    public const ROLE_ADMIN = 'Admin';
+
+    public const ROLE_PROJECT_OWNER = 'PO';
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
 
     public function projects(): HasMany
     {

@@ -39,8 +39,10 @@
         <button type="submit" class="button-primary mt-2 w-full">Sign in</button>
     </form>
 
-    <p class="mt-6 text-center text-sm text-gray-600">
-        New to HiveTasks?
-        <a href="{{ route('register') }}" class="font-semibold text-indigo-600 transition hover:text-indigo-700">Create an account</a>
-    </p>
+    @if ($registrationEnabled)
+        <p class="mt-6 text-center text-sm text-gray-600">
+            New to HiveTasks?
+            <a href="{{ route('register') }}" class="font-semibold text-indigo-600 transition hover:text-indigo-700">Create an account</a>
+        </p>
+    @endif
 @endsection

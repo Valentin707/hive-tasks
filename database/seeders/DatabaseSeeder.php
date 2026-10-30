@@ -16,6 +16,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(KanbanSeeder::class);
+        $this->call([
+            SystemAdminSeeder::class,
+            KanbanSeeder::class,
+        ]);
     }
 }
