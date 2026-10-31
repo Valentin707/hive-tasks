@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
+use App\Models\Project;
 use App\Models\Role;
 use App\Models\SystemSetting;
 use App\Models\User;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -31,6 +34,14 @@ class UserManagement extends Component
 
     public ?int $selectedRoleId = null;
 
+    public string $newName = '';
+
+    public string $newEmail = '';
+
+    public string $newPassword = '';
+
+    public int|string|null $newRoleId = null;
+
     public function mount(): void
     {
         $this->authorizeAdministrator();
@@ -40,6 +51,61 @@ class UserManagement extends Component
     public function updatingSearch(): void
     {
         $this->resetPage();
+    }
+
+    public function closeCreateUserModal(): void
+    {
+        $this->authorizeAdministrator();
+
+        $this->reset(['newName', 'newEmail', 'newPassword', 'newRoleId']);
+        $this->resetValidation();
+    }
+
+    public function createUserAccount(): void
+    {
+        $actor = $this->authorizeAdministrator();
+        $this->newName = trim($this->newName);
+        $this->newEmail = Str::lower(trim($this->newEmail));
+        $this->newRoleId = $this->newRoleId === '' ? null : $this->newRoleId;
+
+        try {
+            $validated = $this->validate([
+                'newName' => ['required', 'string', 'max:255'],
+                'newEmail' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
+                'newPassword' => ['required', 'string', 'min:12', 'max:255'],
+                'newRoleId' => ['nullable', 'integer', 'min:1', Rule::exists('roles', 'id')],
+            ]);
+        } catch (ValidationException $exception) {
+            $this->newPassword = '';
+
+            throw $exception;
+        }
+
+        $plainPassword = $validated['newPassword'];
+        $this->newPassword = '';
+
+        DB::transaction(function () use ($actor, $plainPassword, $validated): void {
+            $this->lockAndAuthorizeAdministrator($actor);
+
+            $role = $validated['newRoleId'] === null
+                ? Role::query()->where('slug', Role::PROJECT_OWNER_SLUG)->lockForUpdate()->firstOrFail()
+                : Role::query()->lockForUpdate()->findOrFail((int) $validated['newRoleId']);
+
+            $user = User::query()->create([
+                'name' => $validated['newName'],
+                'email' => $validated['newEmail'],
+                'password' => Hash::make($plainPassword),
+            ]);
+            $user->roles()->attach($role->getKey());
+
+            $this->createStarterWorkspace($user);
+        });
+
+        $this->reset(['newName', 'newEmail', 'newPassword', 'newRoleId']);
+        $this->resetValidation();
+        $this->resetPage();
+        session()->flash('admin-user-created', 'The account, starter project, board, and columns are ready.');
+        $this->dispatch('user-account-created');
     }
 
     public function toggleRegistration(): void
@@ -273,5 +339,23 @@ class UserManagement extends Component
         $this->editingUserName = '';
         $this->selectedRoleId = null;
         $this->resetValidation();
+    }
+
+    /**
+     * Create the starter workspace without letting the tenant observer assign the acting admin as owner.
+     */
+    private function createStarterWorkspace(User $user): void
+    {
+        $project = Project::withoutEvents(
+            fn (): Project => $user->projects()->create(['name' => 'My First Project']),
+        );
+        $board = $project->boards()->create(['name' => 'Default Board']);
+
+        $board->columns()->createMany([
+            ['name' => 'Todo', 'position' => 1, 'color' => '#6366f1'],
+            ['name' => 'In Progress', 'position' => 2, 'color' => '#f59e0b'],
+            ['name' => 'Done', 'position' => 3, 'color' => '#10b981'],
+            ['name' => 'Deployed', 'position' => 4, 'color' => '#06b6d4'],
+        ]);
     }
 }
