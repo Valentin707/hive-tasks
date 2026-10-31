@@ -39,6 +39,11 @@
                             class="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
                         >
                             <span class="block truncate text-sm font-medium text-gray-800">{{ $note->title !== '' ? $note->title : 'Untitled Note' }}</span>
+                            @if ($note->project)
+                                <span title="Linked to {{ $note->project->name }}" class="mt-1 inline-flex max-w-full items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                                    <span class="truncate">{{ $note->project->name }}</span>
+                                </span>
+                            @endif
                             <span class="mt-1 block truncate text-xs text-gray-500">{{ $note->content ? \Illuminate\Support\Str::limit(html_entity_decode(strip_tags($note->content), ENT_QUOTES | ENT_HTML5, 'UTF-8'), 90) : 'No content yet' }}</span>
                             <span class="mt-2 block text-[11px] text-gray-400">Updated {{ $note->updated_at->diffForHumans() }}</span>
                         </button>
@@ -81,6 +86,16 @@
 
         <section aria-label="Note editor" class="flex min-h-[34rem] flex-col rounded-2xl border border-gray-200 bg-white shadow-sm">
             @if ($activeNote)
+                <div class="flex flex-col gap-2 border-b border-gray-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                    <label for="note-project-link" class="text-xs font-semibold text-gray-600 dark:text-gray-700">Link to Project</label>
+                    <select id="note-project-link" wire:change="updateNoteProject($event.target.value)" class="form-input w-full py-2 text-sm sm:max-w-xs">
+                        <option value="" @selected($activeNote->project_id === null)>None (Global Note)</option>
+                        @foreach ($projects as $project)
+                            <option value="{{ $project->id }}" @selected((int) $activeNote->project_id === (int) $project->getKey())>{{ $project->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 @if ($isEditingNote)
                     <div class="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4 sm:px-7">
                         <div class="min-w-0 flex-1">
@@ -138,6 +153,11 @@
                 <div>
                     <h2 id="create-note-title" class="text-lg font-semibold text-gray-900">Create a note</h2>
                     <p class="mt-1 text-sm text-gray-500">Add a title and start with an optional note.</p>
+                    @if ($contextProject)
+                        <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                            New note will link to {{ $contextProject->name }}
+                        </p>
+                    @endif
                 </div>
                 <button type="button" @click="createNoteOpen = false" class="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close dialog">×</button>
             </div>
