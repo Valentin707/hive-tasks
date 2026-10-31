@@ -29,3 +29,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::post('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme.update');
 });
+
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function (): void {
+    Route::view('/users', 'admin.users.index')->name('users.index');
+});

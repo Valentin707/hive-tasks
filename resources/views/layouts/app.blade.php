@@ -21,6 +21,7 @@
             request()->routeIs('projects.index') => 'Project workspace',
             request()->routeIs('notes.index') => 'Notes workspace',
             request()->routeIs('profile.index') => 'Account settings',
+            request()->routeIs('admin.users.*') => 'Platform administration',
             default => 'Workspace',
         };
     @endphp
@@ -162,6 +163,27 @@
                     </svg>
                     <span x-cloak x-show="sidebarOpen" x-transition.opacity>Notes</span>
                 </a>
+
+                @if (auth()->user()->isAdmin())
+                    <a
+                        href="{{ route('admin.users.index') }}"
+                        title="Admin Settings Desk"
+                        aria-label="Admin Settings Desk"
+                        x-on:click="if (!desktopViewport) sidebarOpen = false"
+                        :class="sidebarOpen ? 'justify-start px-3' : 'justify-center px-2'"
+                        @class([
+                            'flex items-center gap-3 rounded-lg py-2.5 text-sm transition',
+                            'bg-indigo-50 font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-300 dark:hover:bg-indigo-950/70' => request()->routeIs('admin.users.*'),
+                            'font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-100 dark:hover:text-gray-900' => ! request()->routeIs('admin.users.*'),
+                        ])
+                    >
+                        <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3.5 19 6v5.1c0 4.4-2.9 7.4-7 9.4-4.1-2-7-5-7-9.4V6l7-2.5Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m9 12 2 2 4-4" />
+                        </svg>
+                        <span x-cloak x-show="sidebarOpen" x-transition.opacity>Admin Settings Desk</span>
+                    </a>
+                @endif
             </nav>
         </aside>
 
