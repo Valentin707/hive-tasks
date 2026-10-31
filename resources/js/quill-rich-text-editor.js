@@ -1,25 +1,33 @@
 import Quill from 'quill';
 
+const quillEditors = new WeakMap();
+
 const registerQuillRichTextEditor = () => {
     window.Alpine.data('quillRichTextEditor', (options = {}) => ({
-        quill: null,
-        contentInput: null,
-        textChangeHandler: null,
         placeholder: options.placeholder ?? 'Start writing...',
         ariaLabel: options.ariaLabel ?? 'Rich text content',
         minHeight: options.minHeight ?? '28rem',
 
         initialize() {
-            if (this.quill) {
+            const editor = this.$refs.editor;
+
+            if (!(editor instanceof HTMLElement)) {
                 return;
             }
 
-            this.contentInput = this.$refs.contentInput;
+            if (quillEditors.has(editor)) {
+                return;
+            }
+
+            const contentInput = this.$refs.contentInput;
+            const modelBinding = Array.from(contentInput.attributes).find(({ name }) => (
+                name === 'wire:model' || name.startsWith('wire:model.')
+            ));
 
             const initialHtml = this.$refs.initialHtml.value;
-            const initialText = this.contentInput.value;
+            const initialText = contentInput.value;
 
-            this.quill = new Quill(this.$refs.editor, {
+            const quill = new Quill(editor, {
                 theme: 'snow',
                 placeholder: this.placeholder,
                 formats: [
@@ -45,32 +53,53 @@ const registerQuillRichTextEditor = () => {
                 },
             });
 
-            this.quill.root.setAttribute('aria-label', this.ariaLabel);
-            this.quill.root.style.minHeight = this.minHeight;
+            quill.root.setAttribute('aria-label', this.ariaLabel);
+            quill.root.style.minHeight = this.minHeight;
+
+            const normalizedToRange = quill.selection.normalizedToRange.bind(quill.selection);
+            quill.selection.normalizedToRange = (range) => {
+                const positions = [range.start];
+
+                if (!range.native.collapsed) {
+                    positions.push(range.end);
+                }
+
+                if (positions.some(({ node }) => quill.scroll.find(node, true) === null)) {
+                    return null;
+                }
+
+                return normalizedToRange(range);
+            };
 
             if (this.isRichHtml(initialHtml)) {
                 // Persisted HTML is sanitized by the Livewire component before it reaches Quill.
-                this.quill.clipboard.dangerouslyPasteHTML(initialHtml, 'silent');
+                quill.clipboard.dangerouslyPasteHTML(initialHtml, 'silent');
             } else if (initialText !== '') {
-                this.quill.setText(initialText, 'silent');
+                quill.setText(initialText, 'silent');
             }
 
-            this.textChangeHandler = (_delta, _oldDelta, source) => {
+            const textChangeHandler = (_delta, _oldDelta, source) => {
                 if (source !== 'user') {
                     return;
                 }
 
-                const html = this.quill.getLength() <= 1 ? '' : this.quill.getSemanticHTML();
+                const html = quill.getLength() <= 1 ? '' : quill.getSemanticHTML();
 
-                if (this.contentInput.value === html) {
+                if (contentInput.value === html) {
                     return;
                 }
 
-                this.contentInput.value = html;
-                this.contentInput.dispatchEvent(new Event('input', { bubbles: true }));
+                contentInput.value = html;
+
+                if (modelBinding && !modelBinding.name.split('.').includes('live') && this.$wire) {
+                    this.$wire[modelBinding.value] = html;
+                }
+
+                contentInput.dispatchEvent(new Event('input', { bubbles: true }));
             };
 
-            this.quill.on('text-change', this.textChangeHandler);
+            quill.on('text-change', textChangeHandler);
+            quillEditors.set(editor, { quill, textChangeHandler });
         },
 
         isRichHtml(content) {
@@ -78,17 +107,35 @@ const registerQuillRichTextEditor = () => {
         },
 
         clear() {
-            if (!this.quill) {
+            const editor = this.$refs.editor;
+
+            if (!(editor instanceof HTMLElement)) {
                 return;
             }
 
-            this.quill.setText('', 'silent');
-            this.contentInput.value = '';
+            const instance = quillEditors.get(editor);
+
+            if (!instance) {
+                return;
+            }
+
+            instance.quill.setText('', 'silent');
+            this.$refs.contentInput.value = '';
+            this.$refs.contentInput.dispatchEvent(new Event('input', { bubbles: true }));
         },
 
         destroy() {
-            if (this.quill && this.textChangeHandler) {
-                this.quill.off('text-change', this.textChangeHandler);
+            const editor = this.$refs.editor;
+
+            if (!(editor instanceof HTMLElement)) {
+                return;
+            }
+
+            const instance = quillEditors.get(editor);
+
+            if (instance) {
+                instance.quill.off('text-change', instance.textChangeHandler);
+                quillEditors.delete(editor);
             }
         },
     }));

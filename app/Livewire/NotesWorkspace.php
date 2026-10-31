@@ -110,10 +110,11 @@ class NotesWorkspace extends Component
         $this->resetValidation();
     }
 
-    public function finishNoteEditing(): void
+    public function saveNoteEdits(): void
     {
         $this->saveSelectedNote();
         $this->isEditingNote = false;
+        $this->resetValidation();
     }
 
     public function deleteNote(int $noteId): void
@@ -128,16 +129,6 @@ class NotesWorkspace extends Component
         }
 
         $this->resetValidation();
-    }
-
-    public function updatedNoteTitle(): void
-    {
-        $this->saveSelectedNote();
-    }
-
-    public function updatedNoteContent(): void
-    {
-        $this->saveSelectedNote();
     }
 
     public function render(): View
@@ -184,9 +175,7 @@ class NotesWorkspace extends Component
 
     private function saveSelectedNote(): void
     {
-        if ($this->selectedNoteId === null || ! $this->isEditingNote) {
-            return;
-        }
+        abort_if($this->selectedNoteId === null, 404);
 
         $validated = $this->validate([
             'noteTitle' => ['string', 'max:255'],

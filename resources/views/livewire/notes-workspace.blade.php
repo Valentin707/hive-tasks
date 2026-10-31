@@ -97,28 +97,32 @@
                 </div>
 
                 @if ($isEditingNote)
-                    <div class="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4 sm:px-7">
-                        <div class="min-w-0 flex-1">
-                            <label for="note-title" class="sr-only">Note title</label>
-                            <input id="note-title" type="text" maxlength="255" wire:model.live.debounce.1000ms="noteTitle" placeholder="Untitled Note" class="w-full border-0 bg-transparent p-0 text-lg font-semibold text-gray-900 outline-none placeholder:text-gray-400 focus:ring-0 sm:text-xl">
+                    <form wire:submit="saveNoteEdits" class="flex flex-1 flex-col">
+                        <div class="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4 sm:px-7">
+                            <div class="min-w-0 flex-1">
+                                <label for="note-title" class="sr-only">Note title</label>
+                                <input id="note-title" type="text" maxlength="255" wire:model="noteTitle" placeholder="Untitled Note" class="w-full border-0 bg-transparent p-0 text-lg font-semibold text-gray-900 outline-none placeholder:text-gray-400 focus:ring-0 sm:text-xl">
+                            </div>
+                            <span class="shrink-0 text-xs text-gray-400">Changes are saved when you click Save</span>
+                            <button type="submit" wire:loading.attr="disabled" wire:target="saveNoteEdits" class="button-secondary shrink-0 px-3 py-1.5 text-xs">
+                                <span wire:loading.remove wire:target="saveNoteEdits">Save changes</span>
+                                <span wire:loading wire:target="saveNoteEdits">Saving...</span>
+                            </button>
                         </div>
-                        <span wire:loading wire:target="noteTitle,noteContent" class="shrink-0 text-xs text-indigo-600">Saving...</span>
-                        <span wire:loading.remove wire:target="noteTitle,noteContent" class="shrink-0 text-xs text-gray-400">Saved automatically</span>
-                        <button type="button" wire:click="finishNoteEditing" class="button-secondary shrink-0 px-3 py-1.5 text-xs">Done</button>
-                    </div>
 
-                    <div
-                        wire:key="quill-note-editor-{{ $selectedNoteId }}"
-                        x-data="quillRichTextEditor({ placeholder: 'Start writing...', ariaLabel: 'Note content', minHeight: '28rem' })"
-                        x-init="$nextTick(() => initialize())"
-                        class="flex-1 p-5 sm:px-7"
-                    >
-                        <div class="quill-rich-text-editor" wire:ignore>
-                            <div x-ref="editor"></div>
+                        <div
+                            wire:key="quill-note-editor-{{ $selectedNoteId }}"
+                            x-data="quillRichTextEditor({ placeholder: 'Start writing...', ariaLabel: 'Note content', minHeight: '28rem' })"
+                            x-init="$nextTick(() => initialize())"
+                            class="flex-1 p-5 sm:px-7"
+                        >
+                            <div class="quill-rich-text-editor" wire:ignore>
+                                <div x-ref="editor"></div>
+                            </div>
+                            <textarea x-ref="contentInput" wire:model="noteContent" aria-hidden="true" tabindex="-1" class="hidden">{{ $noteContent }}</textarea>
+                            <textarea x-ref="initialHtml" aria-hidden="true" tabindex="-1" class="hidden">{{ $activeNoteHtml }}</textarea>
                         </div>
-                        <textarea x-ref="contentInput" wire:model.live.debounce.1000ms="noteContent" aria-hidden="true" tabindex="-1" class="hidden">{{ $noteContent }}</textarea>
-                        <textarea x-ref="initialHtml" aria-hidden="true" tabindex="-1" class="hidden">{{ $activeNoteHtml }}</textarea>
-                    </div>
+                    </form>
                 @else
                     <div class="border-b border-gray-200 px-5 py-4 sm:px-7">
                         <h2 class="break-words text-lg font-semibold text-gray-900 sm:text-xl">{{ $activeNote->title !== '' ? $activeNote->title : 'Untitled Note' }}</h2>

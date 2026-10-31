@@ -21,7 +21,14 @@ class ProjectNotes extends Component
     #[Locked]
     public ?int $selectedNoteId = null;
 
+    #[Locked]
+    public bool $isEditingNote = false;
+
     public string $search = '';
+
+    public string $noteTitle = '';
+
+    public string $noteContent = '';
 
     public string $newNoteTitle = 'Untitled Note';
 
@@ -41,8 +48,43 @@ class ProjectNotes extends Component
     {
         abort_if($noteId < 1, 422);
 
-        $this->ownedProject()->notes()->whereKey($noteId)->firstOrFail();
-        $this->selectedNoteId = $noteId;
+        $note = $this->ownedProject()->notes()->findOrFail($noteId);
+        $this->selectNoteState($note);
+        $this->isEditingNote = false;
+        $this->resetValidation();
+    }
+
+    public function editNote(int $noteId): void
+    {
+        abort_if($noteId < 1, 422);
+
+        $note = $this->ownedProject()->notes()->findOrFail($noteId);
+        $this->selectNoteState($note);
+        $this->isEditingNote = true;
+        $this->resetValidation();
+    }
+
+    public function saveNoteEdits(): void
+    {
+        $this->saveSelectedNote();
+        $this->isEditingNote = false;
+        $this->resetValidation();
+    }
+
+    public function deleteNote(int $noteId): void
+    {
+        abort_if($noteId < 1, 422);
+
+        $this->ownedProject()->notes()->findOrFail($noteId)->delete();
+
+        if ($this->selectedNoteId === $noteId) {
+            $this->selectedNoteId = null;
+            $this->noteTitle = '';
+            $this->noteContent = '';
+            $this->isEditingNote = false;
+        }
+
+        $this->resetValidation();
     }
 
     public function closeCreateNoteModal(): void
@@ -94,14 +136,44 @@ class ProjectNotes extends Component
         if ($activeNote === null) {
             $activeNote = $notes->first();
             $this->selectedNoteId = $activeNote === null ? null : (int) $activeNote->getKey();
+
+            if ($this->isEditingNote) {
+                $this->isEditingNote = false;
+            }
+        }
+
+        if ($activeNote instanceof Note && ! $this->isEditingNote) {
+            $this->selectNoteState($activeNote);
         }
 
         $activeNoteHtml = $activeNote === null
             ? ''
-            : RichTextSanitizer::sanitize($activeNote->content ?? '');
+            : RichTextSanitizer::sanitize($this->isEditingNote ? $this->noteContent : ($activeNote->content ?? ''));
         $newNoteContentHtml = RichTextSanitizer::sanitize($this->newNoteContent);
 
         return view('livewire.project-notes', compact('project', 'notes', 'activeNote', 'activeNoteHtml', 'newNoteContentHtml', 'search'));
+    }
+
+    private function selectNoteState(Note $note): void
+    {
+        $this->selectedNoteId = (int) $note->getKey();
+        $this->noteTitle = $note->title;
+        $this->noteContent = $note->content ?? '';
+    }
+
+    private function saveSelectedNote(): void
+    {
+        abort_if($this->selectedNoteId === null, 404);
+
+        $validated = $this->validate([
+            'noteTitle' => ['string', 'max:255'],
+            'noteContent' => ['string', 'max:100000'],
+        ]);
+
+        $note = $this->ownedProject()->notes()->findOrFail($this->selectedNoteId);
+        $note->title = $validated['noteTitle'];
+        $note->content = RichTextSanitizer::sanitize($validated['noteContent']);
+        $note->save();
     }
 
     private function ownedProject(): Project

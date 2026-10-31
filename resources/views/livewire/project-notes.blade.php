@@ -58,17 +58,66 @@
 
         <section aria-label="Project note preview" class="flex min-h-[34rem] flex-col rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-200 dark:bg-gray-100 dark:shadow-black/20">
             @if ($activeNote)
-                <div class="border-b border-gray-200 px-5 py-4 sm:px-7 dark:border-gray-200">
-                    <h3 class="break-words text-lg font-semibold text-gray-900 sm:text-xl">{{ $activeNote->title !== '' ? $activeNote->title : 'Untitled Note' }}</h3>
-                    <p class="mt-1 text-xs text-gray-400">Updated {{ $activeNote->updated_at->diffForHumans() }}</p>
-                </div>
-                <div class="min-h-[28rem] flex-1 break-words px-5 py-5 text-sm leading-7 text-gray-700 sm:px-7">
-                    @if ($activeNoteHtml !== '')
-                        <div class="ql-editor quill-content-display">{!! $activeNoteHtml !!}</div>
-                    @else
-                        <span class="italic text-gray-400">No note content yet.</span>
-                    @endif
-                </div>
+                @if ($isEditingNote)
+                    <form wire:submit="saveNoteEdits" class="flex flex-1 flex-col">
+                        <div class="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7 dark:border-gray-200">
+                            <div class="min-w-0 flex-1">
+                                <label for="project-note-title-{{ $activeNote->getKey() }}" class="sr-only">Note title</label>
+                                <input id="project-note-title-{{ $activeNote->getKey() }}" type="text" maxlength="255" wire:model="noteTitle" placeholder="Untitled Note" class="w-full border-0 bg-transparent p-0 text-lg font-semibold text-gray-900 outline-none placeholder:text-gray-400 focus:ring-0 sm:text-xl">
+                                @error('noteTitle')
+                                    <p class="form-error">{{ $message }}</p>
+                                @enderror
+                                <p class="mt-1 text-xs text-gray-400">Updated {{ $activeNote->updated_at->diffForHumans() }}</p>
+                            </div>
+                            <div class="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+                                <span class="text-xs text-gray-400">Save your changes when you are done</span>
+                                <button type="submit" wire:loading.attr="disabled" wire:target="saveNoteEdits" class="button-secondary px-3 py-1.5 text-xs">
+                                    <span wire:loading.remove wire:target="saveNoteEdits">Save changes</span>
+                                    <span wire:loading wire:target="saveNoteEdits">Saving...</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div
+                            wire:key="quill-project-note-editor-{{ $selectedNoteId }}"
+                            x-data="quillRichTextEditor({ placeholder: 'Start writing...', ariaLabel: 'Project note content', minHeight: '28rem' })"
+                            x-init="$nextTick(() => initialize())"
+                            class="flex-1 p-5 sm:px-7"
+                        >
+                            <div class="quill-rich-text-editor" wire:ignore>
+                                <div x-ref="editor"></div>
+                            </div>
+                            <textarea x-ref="contentInput" wire:model="noteContent" aria-hidden="true" tabindex="-1" class="hidden">{{ $noteContent }}</textarea>
+                            <textarea x-ref="initialHtml" aria-hidden="true" tabindex="-1" class="hidden">{{ $activeNoteHtml }}</textarea>
+                            @error('noteContent')
+                                <p class="form-error">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </form>
+                @else
+                    <div class="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7 dark:border-gray-200">
+                        <div class="min-w-0">
+                            <h3 class="break-words text-lg font-semibold text-gray-900 sm:text-xl">{{ $activeNote->title !== '' ? $activeNote->title : 'Untitled Note' }}</h3>
+                            <p class="mt-1 text-xs text-gray-400">Updated {{ $activeNote->updated_at->diffForHumans() }}</p>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <button type="button" wire:click="editNote({{ $activeNote->getKey() }})" wire:loading.attr="disabled" wire:target="editNote" class="button-secondary px-3 py-1.5 text-xs">Edit note</button>
+                            <button type="button" wire:click="deleteNote({{ $activeNote->getKey() }})" wire:confirm="Delete this project note? This action cannot be undone." wire:loading.attr="disabled" wire:target="deleteNote" class="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70">
+                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                                </svg>
+                                Delete note
+                            </button>
+                        </div>
+                    </div>
+                    <div class="min-h-[28rem] flex-1 break-words px-5 py-5 text-sm leading-7 text-gray-700 sm:px-7">
+                        @if ($activeNoteHtml !== '')
+                            <div class="ql-editor quill-content-display">{!! $activeNoteHtml !!}</div>
+                        @else
+                            <span class="italic text-gray-400">No note content yet.</span>
+                        @endif
+                    </div>
+                @endif
             @else
                 <div class="flex flex-1 flex-col items-center justify-center px-6 py-14 text-center">
                     <div class="flex size-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300">
