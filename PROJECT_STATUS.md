@@ -8,7 +8,7 @@
 ## Core Platform
 
 - Session-based registration, login, logout, and authenticated workspace routes.
-- Tenant isolation through the global Eloquent `TenantScope` for projects, boards, columns, tasks, and notes.
+- Tenant isolation through the global Eloquent `TenantScope` for projects, boards, columns, tasks, notes, and labels.
 - Controller-based route entry points for the dashboard, projects, Kanban boards, notes, and profile settings.
 - Responsive application shell with a collapsible sidebar, dynamic page heading, account menu, theme toggle, and date/live-clock footer.
 - Sidebar expanded/collapsed preference persists while navigating between pages.
@@ -32,6 +32,9 @@
 - Kanban columns scroll horizontally without shrinking; mouse dragging pans across the board, and columns preserve a usable height with their own task scrolling.
 - Columns can be added, reordered, renamed, recolored, or deleted. Column deletion requires typing `confirm` and removes the column's tasks.
 - Tasks can be created, moved between columns, edited with rich-text descriptions, and deleted with confirmation.
+- Tenant-owned labels use the normalized `labels` table and `label_task` many-to-many pivot with a composite primary key and cascading foreign keys. Sample labels are provided through `LabelSeeder` and `LabelFactory`.
+- Labels can be created, selected, or removed from a task in its create/edit forms. Task cards show read-only color badges below their creation dates, and board search matches task titles or label names.
+- Task label selections are validated against the signed-in user's labels, and labels are eager-loaded with board tasks to avoid N+1 queries.
 - Board, column, and task updates retain their existing Livewire behavior and persistence.
 
 ## Notes and Profile
@@ -75,6 +78,7 @@ User access is stored in a standalone `roles` table and the many-to-many `role_u
 ## Recent Verification
 
 - Laravel Pint and PHP syntax checks passed for the administration and provisioning changes.
+- Laravel Pint, PHP syntax checking, and Blade view caching passed for the task-label UI updates.
 - `php artisan view:cache` completed successfully.
 - `php artisan route:list --path=admin -v` confirmed the admin route has both authentication and `EnsureUserIsAdmin` middleware.
 - `npm run build` completed successfully. Vite warned that the local Node.js 20.17.0 is below its supported minimum of 20.19.0 (or 22.12.0).
@@ -82,5 +86,5 @@ User access is stored in a standalone `roles` table and the many-to-many `role_u
 
 ## Future Upgrade Possibilities
 
-- Task tagging and labels.
+- Full label-catalog management, including renaming and deleting labels.
 - File attachments within task cards.
