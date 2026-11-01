@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             SystemAdminSeeder::class,
             KanbanSeeder::class,
             LabelSeeder::class,
+            ChecklistItemSeeder::class,
         ]);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models\Scopes;
 
 use App\Models\Board;
+use App\Models\ChecklistItem;
 use App\Models\Column;
 use App\Models\Label;
 use App\Models\Note;
@@ -35,6 +36,7 @@ final class TenantScope implements Scope
             $model instanceof Board => 'project',
             $model instanceof Column => 'board.project',
             $model instanceof Task => 'column.board.project',
+            $model instanceof ChecklistItem => 'task.column.board.project',
             default => null,
         };
 

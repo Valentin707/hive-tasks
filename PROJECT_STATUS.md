@@ -1,14 +1,14 @@
 # HiveTasks Project Status
 
 - **Project:** HiveTasks, a personal project and task workspace
-- **Current revision:** Platform Version 1.2.5 (Normalized RBAC & Admin Desk Fully Stable)
+- **Current revision:** Platform Version 1.3.0 (Subtask Checklist Engine Stable)
 - **Status:** Core workspace, normalized role access control, and platform administration are operational.
 - **Tech stack:** PHP 8.5, Laravel 13.38, Livewire 4.4, Tailwind CSS 4, Alpine.js, Vite 8, Quill 2, and MySQL (`tasks_hive`). The local development setup uses Apache (httpd).
 
 ## Core Platform
 
 - Session-based registration, login, logout, and authenticated workspace routes.
-- Tenant isolation through the global Eloquent `TenantScope` for projects, boards, columns, tasks, notes, and labels.
+- Tenant isolation through the global Eloquent `TenantScope` for projects, boards, columns, tasks, checklist items, notes, and labels.
 - Controller-based route entry points for the dashboard, projects, Kanban boards, notes, and profile settings.
 - Responsive application shell with a collapsible sidebar, dynamic page heading, account menu, theme toggle, and date/live-clock footer.
 - Sidebar expanded/collapsed preference persists while navigating between pages.
@@ -32,6 +32,10 @@
 - Kanban columns scroll horizontally without shrinking; mouse dragging pans across the board, and columns preserve a usable height with their own task scrolling.
 - Columns can be added, reordered, renamed, recolored, or deleted. Column deletion requires typing `confirm` and removes the column's tasks.
 - Tasks can be created, moved between columns, edited with rich-text descriptions, and deleted with confirmation.
+- Task checklists use a dedicated `checklist_items` table with a cascading foreign key to `tasks`; deleting a task also deletes its checklist items.
+- The Livewire board eagerly loads both labels and checklists with `with(['labels', 'checklists'])` to avoid per-task relation queries.
+- Checklist items can be added, checked or unchecked, edited with a 1000 ms debounced save, and deleted from the task edit modal.
+- Task cards show a dark-theme micro progress bar and completed/total item count whenever a checklist exists.
 - Tenant-owned labels use the normalized `labels` table and `label_task` many-to-many pivot with a composite primary key and cascading foreign keys. Sample labels are provided through `LabelSeeder` and `LabelFactory`.
 - Labels can be created, selected, or removed from a task in its create/edit forms. Task cards show read-only color badges below their creation dates, and board search matches task titles or label names.
 - Task label selections are validated against the signed-in user's labels, and labels are eager-loaded with board tasks to avoid N+1 queries.
@@ -80,6 +84,7 @@ User access is stored in a standalone `roles` table and the many-to-many `role_u
 - Laravel Pint and PHP syntax checks passed for the administration and provisioning changes.
 - Laravel Pint, PHP syntax checking, and Blade view caching passed for the task-label UI updates.
 - `php artisan view:cache` completed successfully.
+- Blade view caching and compiled-view PHP syntax checks passed for the project Kanban and checklist modal updates.
 - `php artisan route:list --path=admin -v` confirmed the admin route has both authentication and `EnsureUserIsAdmin` middleware.
 - `npm run build` completed successfully. Vite warned that the local Node.js 20.17.0 is below its supported minimum of 20.19.0 (or 22.12.0).
 - Automated tests were not run during the administration implementation.

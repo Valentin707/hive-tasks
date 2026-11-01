@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Models\Board;
+use App\Models\ChecklistItem;
 use App\Models\Column;
 use App\Models\Label;
 use App\Models\Project;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
@@ -65,6 +67,9 @@ class KanbanBoard extends Component
     public string $newEditTaskLabelName = '';
 
     public string $newEditTaskLabelColor = '#6366f1';
+
+    /** @var array<int, string> */
+    public array $checklistItemTitles = [];
 
     public string $newColumnName = '';
 
@@ -170,13 +175,16 @@ class KanbanBoard extends Component
     {
         abort_if($taskId < 1, 422);
 
-        $task = $this->activeTasks()->with('labels')->whereKey($taskId)->firstOrFail();
+        $task = $this->activeTasks()->with(['labels', 'checklists'])->whereKey($taskId)->firstOrFail();
 
         $this->editingTaskId = (int) $task->getKey();
         $this->editTaskTitle = $task->title;
         $this->editTaskDescription = $task->description ?? '';
         $this->editTaskLabelIds = $task->labels
             ->map(static fn (Label $label): int => (int) $label->getKey())
+            ->all();
+        $this->checklistItemTitles = $task->checklists
+            ->mapWithKeys(static fn (ChecklistItem $item): array => [(int) $item->getKey() => $item->title])
             ->all();
         $this->newEditTaskLabelName = '';
         $this->newEditTaskLabelColor = '#6366f1';
@@ -235,6 +243,66 @@ class KanbanBoard extends Component
         unset($this->userLabels);
     }
 
+    public function addChecklistItem(int $taskId): void
+    {
+        abort_if($taskId < 1, 422);
+
+        $item = DB::transaction(function () use ($taskId): ChecklistItem {
+            $task = $this->activeTasks()->whereKey($taskId)->lockForUpdate()->firstOrFail();
+            $lastPosition = $task->checklists()->max('position');
+
+            return $task->checklists()->create([
+                'title' => 'New item...',
+                'is_completed' => false,
+                'position' => $lastPosition === null ? 0 : (int) $lastPosition + 1,
+            ]);
+        }, 3);
+
+        $this->checklistItemTitles[(int) $item->getKey()] = $item->title;
+    }
+
+    public function toggleChecklistState(int $itemId): void
+    {
+        abort_if($itemId < 1, 422);
+
+        DB::transaction(function () use ($itemId): void {
+            $item = $this->activeChecklistItems()->whereKey($itemId)->lockForUpdate()->firstOrFail();
+            $item->is_completed = ! $item->is_completed;
+            $item->save();
+        }, 3);
+    }
+
+    public function updateChecklistItemTitle(int $itemId, string $newTitle): void
+    {
+        abort_if($itemId < 1, 422);
+
+        $item = $this->activeChecklistItems()->whereKey($itemId)->firstOrFail();
+        $attribute = "checklistItemTitles.{$itemId}";
+        $validatedTitle = Validator::make(
+            ['checklistItemTitles' => [$itemId => $newTitle]],
+            [$attribute => ['string', 'max:255']],
+        )->validate()['checklistItemTitles'][$itemId];
+
+        $item->title = $validatedTitle;
+        $item->save();
+        $this->checklistItemTitles[$itemId] = $validatedTitle;
+    }
+
+    public function updatedChecklistItemTitles(mixed $value, string|int|null $key = null): void
+    {
+        abort_if($key === null || ! ctype_digit((string) $key) || ! is_string($value), 422);
+
+        $this->updateChecklistItemTitle((int) $key, $value);
+    }
+
+    public function deleteChecklistItem(int $itemId): void
+    {
+        abort_if($itemId < 1, 422);
+
+        $this->activeChecklistItems()->whereKey($itemId)->firstOrFail()->delete();
+        unset($this->checklistItemTitles[$itemId]);
+    }
+
     public function deleteTask(int $taskId): void
     {
         abort_if($taskId < 1, 422);
@@ -249,7 +317,14 @@ class KanbanBoard extends Component
     public function closeTaskEditModal(): void
     {
         $this->editingTaskId = null;
-        $this->reset(['editTaskTitle', 'editTaskDescription', 'editTaskLabelIds', 'newEditTaskLabelName', 'newEditTaskLabelColor']);
+        $this->reset([
+            'editTaskTitle',
+            'editTaskDescription',
+            'editTaskLabelIds',
+            'newEditTaskLabelName',
+            'newEditTaskLabelColor',
+            'checklistItemTitles',
+        ]);
         $this->resetValidation();
     }
 
@@ -530,7 +605,7 @@ class KanbanBoard extends Component
                 'boards' => $boardsQuery,
                 'boards.columns' => fn (HasMany $query) => $query->orderBy('position')->orderBy('id'),
                 'boards.columns.tasks' => fn (HasMany $query) => $query
-                    ->with('labels')
+                    ->with(['labels', 'checklists'])
                     ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($search): void {
                         $query
                             ->where('title', 'like', "%{$search}%")
@@ -543,10 +618,14 @@ class KanbanBoard extends Component
 
         abort_if($this->boardId !== null && $project->boards->isEmpty(), 404);
 
+        $editingTask = $this->editingTaskId === null
+            ? null
+            : $this->activeTasks()->with('checklists')->whereKey($this->editingTaskId)->firstOrFail();
+
         $taskDescriptionHtml = RichTextSanitizer::sanitize($this->taskDescription);
         $editTaskDescriptionHtml = RichTextSanitizer::sanitize($this->editTaskDescription);
 
-        return view('livewire.kanban-board', compact('project', 'taskDescriptionHtml', 'editTaskDescriptionHtml'));
+        return view('livewire.kanban-board', compact('project', 'editingTask', 'taskDescriptionHtml', 'editTaskDescriptionHtml'));
     }
 
     private function activeColumns(): Builder
@@ -610,5 +689,14 @@ class KanbanBoard extends Component
         return Task::query()->whereHas('column.board', fn (Builder $query) => $query
             ->where('project_id', $this->projectId)
             ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId)));
+    }
+
+    private function activeChecklistItems(): Builder
+    {
+        return ChecklistItem::query()->whereHas('task', function (Builder $query): void {
+            $query->whereHas('column.board', fn (Builder $boardQuery) => $boardQuery
+                ->where('project_id', $this->projectId)
+                ->when($this->boardId !== null, fn (Builder $boardQuery) => $boardQuery->whereKey($this->boardId)));
+        });
     }
 }

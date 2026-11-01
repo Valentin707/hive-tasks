@@ -112,7 +112,9 @@
                                             @if ($task->labels->isNotEmpty())
                                                 <span class="mb-2 mt-2 flex flex-wrap gap-1" aria-label="Task labels">
                                                     @foreach ($task->labels as $label)
-                                                        @php($isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1)
+                                                        @php
+                                                            $isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1;
+                                                        @endphp
                                                         <span
                                                             class="rounded-full border px-2 py-0.5 text-xs font-medium text-gray-800 dark:text-gray-100 {{ $isHexColor ? '' : $label->color_code }}"
                                                             @if ($isHexColor)
@@ -120,6 +122,30 @@
                                                             @endif
                                                         >{{ $label->name }}</span>
                                                     @endforeach
+                                                </span>
+                                            @endif
+                                            @php
+                                                $checklistTotal = $task->checklists->count();
+                                                $checklistCompleted = $task->checklists->where('is_completed', true)->count();
+                                                $checklistProgress = $checklistTotal > 0
+                                                    ? (int) round(($checklistCompleted / $checklistTotal) * 100)
+                                                    : 0;
+                                            @endphp
+                                            @if ($checklistTotal > 0)
+                                                <span class="mt-3 block" aria-label="Checklist progress: {{ $checklistCompleted }} of {{ $checklistTotal }} items complete">
+                                                    <span class="mb-1.5 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                                        <span>{{ $checklistCompleted }}/{{ $checklistTotal }} {{ $checklistTotal === 1 ? 'item' : 'items' }}</span>
+                                                        <span>{{ $checklistProgress }}%</span>
+                                                    </span>
+                                                    <span
+                                                        role="progressbar"
+                                                        aria-valuemin="0"
+                                                        aria-valuemax="100"
+                                                        aria-valuenow="{{ $checklistProgress }}"
+                                                        class="block h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+                                                    >
+                                                        <span class="block h-full rounded-full bg-indigo-500 transition-[width] duration-300" style="width: {{ $checklistProgress }}%"></span>
+                                                    </span>
                                                 </span>
                                             @endif
                                         </button>
@@ -191,28 +217,53 @@
                                                 @enderror
                                             </div>
 
-                                            <fieldset class="mb-6">
+                                            <fieldset
+                                                wire:key="create-task-label-controls-{{ $column->id }}"
+                                                x-data="{ labelsDropdownOpen: false, newLabelFormOpen: false }"
+                                                x-on:click.outside="labelsDropdownOpen = false"
+                                                x-on:keydown.escape.window="labelsDropdownOpen = false; newLabelFormOpen = false"
+                                                class="mb-6"
+                                            >
                                                 <legend class="form-label">Labels <span class="font-normal text-gray-400">(optional)</span></legend>
-                                                @if ($this->userLabels->isNotEmpty())
-                                                    <div class="grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded-xl p-1 sm:grid-cols-2">
-                                                        @foreach ($this->userLabels as $label)
-                                                            @php($isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1)
-                                                            <label wire:key="create-task-label-{{ $column->id }}-{{ $label->id }}" class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800">
-                                                                <input type="checkbox" wire:model="taskLabelIds" value="{{ $label->id }}" class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800">
-                                                                <span class="size-2.5 shrink-0 rounded-full {{ $isHexColor ? '' : $label->color_code }}" @if ($isHexColor) style="background-color: {{ $label->color_code }}" @endif aria-hidden="true"></span>
-                                                                <span class="min-w-0 truncate">{{ $label->name }}</span>
-                                                            </label>
-                                                        @endforeach
-                                                    </div>
-                                                @else
-                                                    <p class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">No labels available.</p>
-                                                @endif
-                                                <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-                                                    <input type="text" wire:model="newTaskLabelName" maxlength="80" placeholder="New label name" aria-label="New label name" class="form-input flex-1">
-                                                    <div class="flex items-center gap-2">
-                                                        <label for="create-task-label-color-{{ $column->id }}" class="sr-only">New label color</label>
-                                                        <input id="create-task-label-color-{{ $column->id }}" type="color" wire:model="newTaskLabelColor" class="size-10 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
-                                                        <button type="button" wire:click="addLabelToNewTask" wire:loading.attr="disabled" wire:target="addLabelToNewTask" class="button-secondary whitespace-nowrap px-3">Add label</button>
+                                                <button
+                                                    type="button"
+                                                    aria-controls="create-task-label-list-{{ $column->id }}"
+                                                    aria-haspopup="true"
+                                                    x-bind:aria-expanded="labelsDropdownOpen.toString()"
+                                                    @click="labelsDropdownOpen = ! labelsDropdownOpen"
+                                                    class="form-input flex cursor-pointer items-center justify-between text-left"
+                                                >
+                                                    <span>Choose existing labels</span>
+                                                    <svg class="size-4 transition-transform" x-bind:class="labelsDropdownOpen ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                        <path fill-rule="evenodd" d="M5.22 7.22a.75.75 0 0 1 1.06 0L10 10.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                                <div id="create-task-label-list-{{ $column->id }}" x-cloak x-show="labelsDropdownOpen" x-transition.opacity class="mt-2 max-h-40 overflow-y-auto rounded-xl bg-white p-1 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
+                                                    @forelse ($this->userLabels as $label)
+                                                        @php
+                                                            $isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1;
+                                                        @endphp
+                                                        <label wire:key="create-task-label-{{ $column->id }}-{{ $label->id }}" class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800">
+                                                            <input type="checkbox" wire:model="taskLabelIds" value="{{ $label->id }}" class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800">
+                                                            <span class="size-2.5 shrink-0 rounded-full {{ $isHexColor ? '' : $label->color_code }}" @if ($isHexColor) style="background-color: {{ $label->color_code }}" @endif aria-hidden="true"></span>
+                                                            <span class="min-w-0 truncate">{{ $label->name }}</span>
+                                                        </label>
+                                                    @empty
+                                                        <p class="px-2.5 py-2 text-sm text-gray-500 dark:text-gray-400">No labels available.</p>
+                                                    @endforelse
+                                                </div>
+                                                <button type="button" @click="newLabelFormOpen = ! newLabelFormOpen; labelsDropdownOpen = false" x-bind:aria-expanded="newLabelFormOpen.toString()" class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950/40">
+                                                    <span aria-hidden="true" class="text-base leading-none">+</span>
+                                                    Add new label
+                                                </button>
+                                                <div x-cloak x-show="newLabelFormOpen" x-transition.opacity class="mt-2 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
+                                                    <div class="flex flex-col gap-2 sm:flex-row">
+                                                        <input type="text" wire:model="newTaskLabelName" maxlength="80" placeholder="New label name" aria-label="New label name" class="form-input flex-1">
+                                                        <div class="flex items-center gap-2">
+                                                            <label for="create-task-label-color-{{ $column->id }}" class="sr-only">New label color</label>
+                                                            <input id="create-task-label-color-{{ $column->id }}" type="color" wire:model="newTaskLabelColor" class="size-10 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
+                                                            <button type="button" wire:click="addLabelToNewTask" wire:loading.attr="disabled" wire:target="addLabelToNewTask" class="button-secondary whitespace-nowrap px-3">Create label</button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 @error('newTaskLabelName')
@@ -369,7 +420,7 @@
 
     @if ($editingTaskId !== null)
         <div x-cloak x-show="taskEditModalOpen" x-transition.opacity class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 sm:items-center" @click.self="taskEditModalOpen = false; $wire.closeTaskEditModal()">
-            <section role="dialog" aria-modal="true" aria-labelledby="edit-task-title" class="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-7">
+            <section role="dialog" aria-modal="true" aria-labelledby="edit-task-title" class="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-7 lg:w-[70vw] lg:max-w-6xl">
                 <div class="mb-6 flex items-start justify-between gap-4">
                     <div>
                         <h2 id="edit-task-title" class="text-lg font-semibold text-gray-900">Edit task</h2>
@@ -378,16 +429,78 @@
                     <button type="button" wire:click="closeTaskEditModal" @click="taskEditModalOpen = false" class="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close dialog">×</button>
                 </div>
 
-                <form wire:submit="updateTask">
-                    <div class="mb-5">
-                        <label for="edit-task-title-field" class="form-label">Title</label>
-                        <input id="edit-task-title-field" type="text" wire:model="editTaskTitle" maxlength="255" required class="form-input" @error('editTaskTitle') aria-invalid="true" aria-describedby="edit-task-title-error" @enderror>
-                        @error('editTaskTitle')
-                            <p id="edit-task-title-error" class="form-error">{{ $message }}</p>
-                        @enderror
-                    </div>
+                <form wire:submit="updateTask" class="grid grid-cols-1 gap-5 lg:grid-cols-12">
+                        <div class="order-1 lg:col-span-8 lg:col-start-1 lg:row-start-1">
+                            <label for="edit-task-title-field" class="form-label">Title</label>
+                            <input id="edit-task-title-field" type="text" wire:model="editTaskTitle" maxlength="255" required class="form-input" @error('editTaskTitle') aria-invalid="true" aria-describedby="edit-task-title-error" @enderror>
+                            @error('editTaskTitle')
+                                <p id="edit-task-title-error" class="form-error">{{ $message }}</p>
+                            @enderror
+                        </div>
 
-                    <div class="mb-6">
+                        <fieldset
+                            wire:key="edit-task-label-controls-{{ $editingTaskId }}"
+                            x-data="{ labelsDropdownOpen: false, newLabelFormOpen: false }"
+                            x-on:click.outside="labelsDropdownOpen = false"
+                            x-on:keydown.escape.window="labelsDropdownOpen = false; newLabelFormOpen = false"
+                            class="order-4 lg:col-span-4 lg:col-start-9 lg:row-span-3 lg:row-start-1 lg:self-start"
+                        >
+                            <legend class="form-label">Labels <span class="font-normal text-gray-400">(optional)</span></legend>
+                            <button
+                                type="button"
+                                aria-controls="edit-task-label-list-{{ $editingTaskId }}"
+                                aria-haspopup="true"
+                                x-bind:aria-expanded="labelsDropdownOpen.toString()"
+                                @click="labelsDropdownOpen = ! labelsDropdownOpen"
+                                class="form-input flex cursor-pointer items-center justify-between text-left"
+                            >
+                                <span>Choose existing labels</span>
+                                <svg class="size-4 transition-transform" x-bind:class="labelsDropdownOpen ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5.22 7.22a.75.75 0 0 1 1.06 0L10 10.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                            <div id="edit-task-label-list-{{ $editingTaskId }}" x-cloak x-show="labelsDropdownOpen" x-transition.opacity class="mt-2 max-h-40 overflow-y-auto rounded-xl bg-white p-1 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
+                                @forelse ($this->userLabels as $label)
+                                    @php
+                                        $isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1;
+                                    @endphp
+                                    <label wire:key="edit-task-label-{{ $editingTaskId }}-{{ $label->id }}" class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800">
+                                        <input type="checkbox" wire:model="editTaskLabelIds" value="{{ $label->id }}" class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800">
+                                        <span class="size-2.5 shrink-0 rounded-full {{ $isHexColor ? '' : $label->color_code }}" @if ($isHexColor) style="background-color: {{ $label->color_code }}" @endif aria-hidden="true"></span>
+                                        <span class="min-w-0 truncate">{{ $label->name }}</span>
+                                    </label>
+                                @empty
+                                    <p class="px-2.5 py-2 text-sm text-gray-500 dark:text-gray-400">No labels available.</p>
+                                @endforelse
+                            </div>
+                            <button type="button" @click="newLabelFormOpen = ! newLabelFormOpen; labelsDropdownOpen = false" x-bind:aria-expanded="newLabelFormOpen.toString()" class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950/40">
+                                <span aria-hidden="true" class="text-base leading-none">+</span>
+                                Add new label
+                            </button>
+                            <div x-cloak x-show="newLabelFormOpen" x-transition.opacity class="mt-2 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
+                                <div class="flex flex-col gap-2 sm:flex-row">
+                                    <input type="text" wire:model="newEditTaskLabelName" maxlength="80" placeholder="New label name" aria-label="New label name" class="form-input flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <label for="edit-task-label-color" class="sr-only">New label color</label>
+                                        <input id="edit-task-label-color" type="color" wire:model="newEditTaskLabelColor" class="size-10 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
+                                        <button type="button" wire:click="addLabelToEditedTask" wire:loading.attr="disabled" wire:target="addLabelToEditedTask" class="button-secondary whitespace-nowrap px-3">Create label</button>
+                                    </div>
+                                </div>
+                            </div>
+                            @error('newEditTaskLabelName')
+                                <p class="form-error">{{ $message }}</p>
+                            @enderror
+                            @error('newEditTaskLabelColor')
+                                <p class="form-error">{{ $message }}</p>
+                            @enderror
+                            @error('editTaskLabelIds')
+                                <p class="form-error">{{ $message }}</p>
+                            @enderror
+                            @error('editTaskLabelIds.*')
+                                <p class="form-error">{{ $message }}</p>
+                            @enderror
+                        </fieldset>
+                    <div class="order-2 lg:col-span-8 lg:col-start-1 lg:row-start-2">
                         <p class="form-label">Description <span class="font-normal text-gray-400">(optional)</span></p>
                         <div
                             wire:key="task-description-editor-{{ $editingTaskId }}"
@@ -405,45 +518,69 @@
                         @enderror
                     </div>
 
-                    <fieldset class="mb-6">
-                        <legend class="form-label">Labels <span class="font-normal text-gray-400">(optional)</span></legend>
-                        @if ($this->userLabels->isNotEmpty())
-                            <div class="grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded-xl p-1 sm:grid-cols-2">
-                                @foreach ($this->userLabels as $label)
-                                    @php($isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1)
-                                    <label wire:key="edit-task-label-{{ $editingTaskId }}-{{ $label->id }}" class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800">
-                                        <input type="checkbox" wire:model="editTaskLabelIds" value="{{ $label->id }}" class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800">
-                                        <span class="size-2.5 shrink-0 rounded-full {{ $isHexColor ? '' : $label->color_code }}" @if ($isHexColor) style="background-color: {{ $label->color_code }}" @endif aria-hidden="true"></span>
-                                        <span class="min-w-0 truncate">{{ $label->name }}</span>
-                                    </label>
-                                @endforeach
+                    <section class="order-3 rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-800/50 lg:col-span-8 lg:col-start-1 lg:row-start-3" aria-labelledby="task-checklist-heading">
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <div>
+                                <h3 id="task-checklist-heading" class="text-sm font-semibold text-gray-800 dark:text-gray-100">Task Checklist</h3>
+                                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Break this task into smaller steps.</p>
                             </div>
-                        @else
-                            <p class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">No labels available.</p>
-                        @endif
-                        <div class="mt-3 flex flex-col gap-2 sm:flex-row">
-                            <input type="text" wire:model="newEditTaskLabelName" maxlength="80" placeholder="New label name" aria-label="New label name" class="form-input flex-1">
-                            <div class="flex items-center gap-2">
-                                <label for="edit-task-label-color" class="sr-only">New label color</label>
-                                <input id="edit-task-label-color" type="color" wire:model="newEditTaskLabelColor" class="size-10 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
-                                <button type="button" wire:click="addLabelToEditedTask" wire:loading.attr="disabled" wire:target="addLabelToEditedTask" class="button-secondary whitespace-nowrap px-3">Add label</button>
-                            </div>
+                            <button
+                                type="button"
+                                wire:click="addChecklistItem({{ $editingTask->id }})"
+                                wire:loading.attr="disabled"
+                                wire:target="addChecklistItem"
+                                class="button-secondary shrink-0 px-3 py-2 text-xs"
+                            >
+                                <span aria-hidden="true" class="mr-1 text-base leading-none">+</span>Add item
+                            </button>
                         </div>
-                        @error('newEditTaskLabelName')
-                            <p class="form-error">{{ $message }}</p>
-                        @enderror
-                        @error('newEditTaskLabelColor')
-                            <p class="form-error">{{ $message }}</p>
-                        @enderror
-                        @error('editTaskLabelIds')
-                            <p class="form-error">{{ $message }}</p>
-                        @enderror
-                        @error('editTaskLabelIds.*')
-                            <p class="form-error">{{ $message }}</p>
-                        @enderror
-                    </fieldset>
 
-                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <div class="space-y-2">
+                            @forelse ($editingTask->checklists as $item)
+                                <div wire:key="task-checklist-item-{{ $item->id }}" class="flex items-start gap-2.5 rounded-lg bg-white px-3 py-2.5 dark:bg-gray-900/70">
+                                    <input
+                                        id="checklist-item-{{ $item->id }}"
+                                        type="checkbox"
+                                        wire:click="toggleChecklistState({{ $item->id }})"
+                                        @checked($item->is_completed)
+                                        aria-label="Mark {{ $item->title }} {{ $item->is_completed ? 'incomplete' : 'complete' }}"
+                                        class="mt-1 size-4 shrink-0 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800"
+                                    >
+                                    <div class="min-w-0 flex-1">
+                                        <label for="checklist-item-{{ $item->id }}" class="sr-only">Checklist item title</label>
+                                        <input
+                                            type="text"
+                                            wire:model.live.debounce.1000ms="checklistItemTitles.{{ $item->id }}"
+                                            maxlength="255"
+                                            aria-label="Checklist item title"
+                                            @class([
+                                                'w-full border-0 bg-transparent p-0 text-sm text-gray-700 outline-none ring-0 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-gray-200',
+                                                'line-through opacity-60' => $item->is_completed,
+                                            ])
+                                        >
+                                        @error("checklistItemTitles.{$item->id}")
+                                            <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                    <button
+                                        type="button"
+                                        wire:click="deleteChecklistItem({{ $item->id }})"
+                                        aria-label="Delete checklist item: {{ $item->title }}"
+                                        title="Delete checklist item"
+                                        class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                                    >
+                                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            @empty
+                                <p class="rounded-lg border border-dashed border-gray-300 px-3 py-4 text-center text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">No checklist items yet.</p>
+                            @endforelse
+                        </div>
+                    </section>
+
+                    <div class="order-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end lg:col-span-12">
                         <button type="button" wire:click="closeTaskEditModal" @click="taskEditModalOpen = false" class="button-secondary">Cancel</button>
                         <button type="submit" class="button-primary" wire:loading.attr="disabled" wire:target="updateTask">
                             <span wire:loading.remove wire:target="updateTask">Save changes</span>
