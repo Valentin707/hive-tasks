@@ -243,6 +243,20 @@ class KanbanBoard extends Component
         unset($this->userLabels);
     }
 
+    public function removeLabelFromEditedTask(int $labelId): void
+    {
+        abort_if($this->editingTaskId === null, 404);
+        $this->activeTasks()->whereKey($this->editingTaskId)->firstOrFail();
+
+        $selectedLabelIds = $this->validatedUserLabelIds($this->editTaskLabelIds, 'editTaskLabelIds');
+        $labelIdToRemove = $this->validatedUserLabelIds([$labelId], 'editTaskLabelIds')[0];
+
+        $this->editTaskLabelIds = array_values(array_filter(
+            $selectedLabelIds,
+            static fn (int $selectedLabelId): bool => $selectedLabelId !== $labelIdToRemove,
+        ));
+    }
+
     public function addChecklistItem(int $taskId): void
     {
         abort_if($taskId < 1, 422);

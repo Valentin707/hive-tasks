@@ -116,7 +116,7 @@
                                                             $isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1;
                                                         @endphp
                                                         <span
-                                                            class="rounded-full border px-2 py-0.5 text-xs font-medium text-gray-800 dark:text-gray-100 {{ $isHexColor ? '' : $label->color_code }}"
+                                                            class="rounded-full border px-2 py-0.5 text-xs font-medium text-gray-800 dark:text-[#fff] {{ $isHexColor ? '' : $label->color_code }}"
                                                             @if ($isHexColor)
                                                                 style="background-color: color-mix(in srgb, {{ $label->color_code }} 14%, transparent); border-color: color-mix(in srgb, {{ $label->color_code }} 38%, transparent);"
                                                             @endif
@@ -446,6 +446,38 @@
                             class="order-4 lg:col-span-4 lg:col-start-9 lg:row-span-3 lg:row-start-1 lg:self-start"
                         >
                             <legend class="form-label">Labels <span class="font-normal text-gray-400">(optional)</span></legend>
+                            @php
+                                $selectedEditTaskLabels = $this->userLabels->whereIn('id', $editTaskLabelIds);
+                            @endphp
+                            @if ($selectedEditTaskLabels->isNotEmpty())
+                                <div class="mb-2 flex flex-wrap gap-1.5" aria-label="Selected labels">
+                                    @foreach ($selectedEditTaskLabels as $label)
+                                        @php
+                                            $isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1;
+                                        @endphp
+                                        <span
+                                            wire:key="selected-edit-task-label-{{ $editingTaskId }}-{{ $label->id }}"
+                                            class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium text-gray-800 dark:text-[#fff] {{ $isHexColor ? '' : $label->color_code }}"
+                                            @if ($isHexColor)
+                                                style="background-color: color-mix(in srgb, {{ $label->color_code }} 14%, transparent); border-color: color-mix(in srgb, {{ $label->color_code }} 38%, transparent);"
+                                            @endif
+                                        >
+                                            <span>{{ $label->name }}</span>
+                                            <button
+                                                type="button"
+                                                wire:click="removeLabelFromEditedTask({{ $label->id }})"
+                                                aria-label="Remove {{ $label->name }} label"
+                                                title="Remove label"
+                                                class="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-current/70 transition hover:bg-black/10 hover:text-current focus:outline-none focus:ring-1 focus:ring-current"
+                                            >
+                                                <svg class="size-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                                    <path stroke-linecap="round" d="m4 4 8 8M12 4l-8 8" />
+                                                </svg>
+                                            </button>
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
                             <button
                                 type="button"
                                 aria-controls="edit-task-label-list-{{ $editingTaskId }}"
