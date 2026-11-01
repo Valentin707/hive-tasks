@@ -6,12 +6,16 @@ namespace App\Livewire;
 
 use App\Models\Board;
 use App\Models\Column;
+use App\Models\Label;
 use App\Models\Project;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -42,11 +46,25 @@ class KanbanBoard extends Component
 
     public string $taskDescription = '';
 
+    /** @var list<int|string> */
+    public array $taskLabelIds = [];
+
+    public string $newTaskLabelName = '';
+
+    public string $newTaskLabelColor = '#6366f1';
+
     public string $search = '';
 
     public string $editTaskTitle = '';
 
     public string $editTaskDescription = '';
+
+    /** @var list<int|string> */
+    public array $editTaskLabelIds = [];
+
+    public string $newEditTaskLabelName = '';
+
+    public string $newEditTaskLabelColor = '#6366f1';
 
     public string $newColumnName = '';
 
@@ -62,12 +80,21 @@ class KanbanBoard extends Component
         $this->boardId = $boardId;
     }
 
+    /**
+     * @return EloquentCollection<int, Label>
+     */
+    #[Computed]
+    public function userLabels(): EloquentCollection
+    {
+        return Label::query()->orderBy('name')->get();
+    }
+
     public function openTaskModal(int $columnId): void
     {
         $this->activeColumns()->whereKey($columnId)->firstOrFail();
 
         $this->taskColumnId = $columnId;
-        $this->reset(['taskTitle', 'taskDescription']);
+        $this->reset(['taskTitle', 'taskDescription', 'taskLabelIds', 'newTaskLabelName', 'newTaskLabelColor']);
         $this->resetValidation();
         $this->dispatch('task-create-opened', columnId: $columnId);
     }
@@ -78,11 +105,14 @@ class KanbanBoard extends Component
             'taskColumnId' => ['required', 'integer', 'min:1'],
             'taskTitle' => ['required', 'string', 'max:255'],
             'taskDescription' => ['nullable', 'string', 'max:10000'],
+            'taskLabelIds' => ['array'],
+            'taskLabelIds.*' => ['integer', 'min:1', 'distinct'],
         ]);
 
         $columnId = (int) $validated['taskColumnId'];
+        $labelIds = $this->validatedUserLabelIds($validated['taskLabelIds'] ?? [], 'taskLabelIds');
 
-        $task = DB::transaction(function () use ($columnId, $validated): Task {
+        $task = DB::transaction(function () use ($columnId, $labelIds, $validated): Task {
             $column = $this->activeColumns()
                 ->whereKey($columnId)
                 ->lockForUpdate()
@@ -90,14 +120,18 @@ class KanbanBoard extends Component
 
             $position = (int) $column->tasks()->max('position') + 1;
 
-            return $column->tasks()->create([
+            $task = $column->tasks()->create([
                 'title' => $validated['taskTitle'],
                 'description' => RichTextSanitizer::sanitize($validated['taskDescription'] ?? '') ?: null,
                 'position' => $position,
             ]);
+
+            $task->labels()->sync($labelIds);
+
+            return $task;
         }, 3);
 
-        $this->reset(['taskTitle', 'taskDescription']);
+        $this->reset(['taskTitle', 'taskDescription', 'taskLabelIds', 'newTaskLabelName', 'newTaskLabelColor']);
         $this->taskColumnId = null;
         $this->resetValidation();
 
@@ -112,15 +146,40 @@ class KanbanBoard extends Component
         ]);
     }
 
+    public function addLabelToNewTask(): void
+    {
+        abort_if($this->taskColumnId === null, 404);
+        $this->activeColumns()->whereKey($this->taskColumnId)->firstOrFail();
+
+        $validated = $this->validate([
+            'taskLabelIds' => ['array'],
+            'taskLabelIds.*' => ['integer', 'min:1', 'distinct'],
+            'newTaskLabelName' => ['required', 'string', 'max:80'],
+            'newTaskLabelColor' => ['required', 'string', 'regex:/\A#[0-9a-fA-F]{6}\z/'],
+        ]);
+
+        $this->taskLabelIds = $this->validatedUserLabelIds($validated['taskLabelIds'] ?? [], 'taskLabelIds');
+        $label = $this->createOrGetUserLabel($validated['newTaskLabelName'], $validated['newTaskLabelColor']);
+        $this->taskLabelIds = array_values(array_unique([...$this->taskLabelIds, (int) $label->getKey()]));
+        $this->newTaskLabelName = '';
+        $this->resetValidation();
+        unset($this->userLabels);
+    }
+
     public function openTaskEditModal(int $taskId): void
     {
         abort_if($taskId < 1, 422);
 
-        $task = $this->activeTasks()->whereKey($taskId)->firstOrFail();
+        $task = $this->activeTasks()->with('labels')->whereKey($taskId)->firstOrFail();
 
         $this->editingTaskId = (int) $task->getKey();
         $this->editTaskTitle = $task->title;
         $this->editTaskDescription = $task->description ?? '';
+        $this->editTaskLabelIds = $task->labels
+            ->map(static fn (Label $label): int => (int) $label->getKey())
+            ->all();
+        $this->newEditTaskLabelName = '';
+        $this->newEditTaskLabelColor = '#6366f1';
         $this->resetValidation();
         $this->dispatch('task-edit-opened');
     }
@@ -132,18 +191,48 @@ class KanbanBoard extends Component
         $validated = $this->validate([
             'editTaskTitle' => ['required', 'string', 'max:255'],
             'editTaskDescription' => ['nullable', 'string', 'max:10000'],
+            'editTaskLabelIds' => ['array'],
+            'editTaskLabelIds.*' => ['integer', 'min:1', 'distinct'],
         ]);
 
-        $task = $this->activeTasks()->whereKey($this->editingTaskId)->firstOrFail();
-        $task->title = $validated['editTaskTitle'];
-        $task->description = RichTextSanitizer::sanitize($validated['editTaskDescription'] ?? '') ?: null;
-        $task->save();
+        $labelIds = $this->validatedUserLabelIds($validated['editTaskLabelIds'] ?? [], 'editTaskLabelIds');
+        $editingTaskId = $this->editingTaskId;
+
+        $task = DB::transaction(function () use ($editingTaskId, $labelIds, $validated): Task {
+            $task = $this->activeTasks()->whereKey($editingTaskId)->lockForUpdate()->firstOrFail();
+            $task->title = $validated['editTaskTitle'];
+            $task->description = RichTextSanitizer::sanitize($validated['editTaskDescription'] ?? '') ?: null;
+            $task->save();
+            $task->labels()->sync($labelIds);
+
+            return $task;
+        }, 3);
 
         $taskId = (int) $task->getKey();
         $title = $task->title;
 
         $this->closeTaskEditModal();
         $this->dispatch('task-updated', taskId: $taskId, title: $title);
+    }
+
+    public function addLabelToEditedTask(): void
+    {
+        abort_if($this->editingTaskId === null, 404);
+        $this->activeTasks()->whereKey($this->editingTaskId)->firstOrFail();
+
+        $validated = $this->validate([
+            'editTaskLabelIds' => ['array'],
+            'editTaskLabelIds.*' => ['integer', 'min:1', 'distinct'],
+            'newEditTaskLabelName' => ['required', 'string', 'max:80'],
+            'newEditTaskLabelColor' => ['required', 'string', 'regex:/\A#[0-9a-fA-F]{6}\z/'],
+        ]);
+
+        $this->editTaskLabelIds = $this->validatedUserLabelIds($validated['editTaskLabelIds'] ?? [], 'editTaskLabelIds');
+        $label = $this->createOrGetUserLabel($validated['newEditTaskLabelName'], $validated['newEditTaskLabelColor']);
+        $this->editTaskLabelIds = array_values(array_unique([...$this->editTaskLabelIds, (int) $label->getKey()]));
+        $this->newEditTaskLabelName = '';
+        $this->resetValidation();
+        unset($this->userLabels);
     }
 
     public function deleteTask(int $taskId): void
@@ -160,7 +249,7 @@ class KanbanBoard extends Component
     public function closeTaskEditModal(): void
     {
         $this->editingTaskId = null;
-        $this->reset(['editTaskTitle', 'editTaskDescription']);
+        $this->reset(['editTaskTitle', 'editTaskDescription', 'editTaskLabelIds', 'newEditTaskLabelName', 'newEditTaskLabelColor']);
         $this->resetValidation();
     }
 
@@ -465,6 +554,48 @@ class KanbanBoard extends Component
         return Column::query()->whereHas('board', fn (Builder $query) => $query
             ->where('project_id', $this->projectId)
             ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId)));
+    }
+
+    /**
+     * @param  list<int|string>  $labelIds
+     * @return list<int>
+     */
+    private function validatedUserLabelIds(array $labelIds, string $attribute): array
+    {
+        $labelIds = array_values(array_unique(array_map(
+            static fn (int|string $labelId): int => (int) $labelId,
+            $labelIds,
+        )));
+
+        $ownedLabelsCount = Label::query()
+            ->where('user_id', auth()->id())
+            ->whereKey($labelIds)
+            ->count();
+
+        if ($ownedLabelsCount !== count($labelIds)) {
+            throw ValidationException::withMessages([
+                $attribute => 'Select only labels that belong to your account.',
+            ]);
+        }
+
+        return $labelIds;
+    }
+
+    private function createOrGetUserLabel(string $name, string $colorCode): Label
+    {
+        $existingLabel = Label::query()
+            ->where('user_id', auth()->id())
+            ->where('name', $name)
+            ->first();
+
+        if ($existingLabel !== null) {
+            return $existingLabel;
+        }
+
+        return Label::query()->create([
+            'name' => $name,
+            'color_code' => $colorCode,
+        ]);
     }
 
     private function activeBoards(): Builder

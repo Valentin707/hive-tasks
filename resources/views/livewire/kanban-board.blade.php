@@ -105,17 +105,23 @@
 
                             <div wire:ignore.self wire:key="kanban-column-dropzone-{{ $column->id }}" class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
                                 @foreach ($column->tasks as $task)
-                                    <article class="draggable relative cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
+                                    <article wire:key="kanban-task-{{ $task->id }}" class="draggable relative cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
                                         <button type="button" data-task-edit-button data-task-id="{{ $task->id }}" aria-label="Open task: {{ $task->title }}" class="block w-full rounded pr-10 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                                             <span data-task-title class="block text-sm font-medium leading-5 text-gray-800">{{ $task->title }}</span>
+                                            <time datetime="{{ $task->created_at->toIso8601String() }}" data-task-created-at class="mt-2 block text-xs text-gray-500">Created {{ $task->created_at->format('M j, Y') }}</time>
                                             @if ($task->labels->isNotEmpty())
-                                                <span class="mt-2 flex flex-wrap gap-1.5" aria-label="Task labels">
+                                                <span class="mb-2 mt-2 flex flex-wrap gap-1" aria-label="Task labels">
                                                     @foreach ($task->labels as $label)
-                                                        <span class="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ $label->name }}</span>
+                                                        @php($isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1)
+                                                        <span
+                                                            class="rounded-full border px-2 py-0.5 text-xs font-medium text-gray-800 dark:text-gray-100 {{ $isHexColor ? '' : $label->color_code }}"
+                                                            @if ($isHexColor)
+                                                                style="background-color: color-mix(in srgb, {{ $label->color_code }} 14%, transparent); border-color: color-mix(in srgb, {{ $label->color_code }} 38%, transparent);"
+                                                            @endif
+                                                        >{{ $label->name }}</span>
                                                     @endforeach
                                                 </span>
                                             @endif
-                                            <time datetime="{{ $task->created_at->toIso8601String() }}" data-task-created-at class="mt-2 block text-xs text-gray-500">Created {{ $task->created_at->format('M j, Y') }}</time>
                                         </button>
                                         <button
                                             type="button"
@@ -184,6 +190,44 @@
                                                     <p id="task-description-error-{{ $column->id }}" class="form-error">{{ $message }}</p>
                                                 @enderror
                                             </div>
+
+                                            <fieldset class="mb-6">
+                                                <legend class="form-label">Labels <span class="font-normal text-gray-400">(optional)</span></legend>
+                                                @if ($this->userLabels->isNotEmpty())
+                                                    <div class="grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded-xl p-1 sm:grid-cols-2">
+                                                        @foreach ($this->userLabels as $label)
+                                                            @php($isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1)
+                                                            <label wire:key="create-task-label-{{ $column->id }}-{{ $label->id }}" class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800">
+                                                                <input type="checkbox" wire:model="taskLabelIds" value="{{ $label->id }}" class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800">
+                                                                <span class="size-2.5 shrink-0 rounded-full {{ $isHexColor ? '' : $label->color_code }}" @if ($isHexColor) style="background-color: {{ $label->color_code }}" @endif aria-hidden="true"></span>
+                                                                <span class="min-w-0 truncate">{{ $label->name }}</span>
+                                                            </label>
+                                                        @endforeach
+                                                    </div>
+                                                @else
+                                                    <p class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">No labels available.</p>
+                                                @endif
+                                                <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                                                    <input type="text" wire:model="newTaskLabelName" maxlength="80" placeholder="New label name" aria-label="New label name" class="form-input flex-1">
+                                                    <div class="flex items-center gap-2">
+                                                        <label for="create-task-label-color-{{ $column->id }}" class="sr-only">New label color</label>
+                                                        <input id="create-task-label-color-{{ $column->id }}" type="color" wire:model="newTaskLabelColor" class="size-10 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
+                                                        <button type="button" wire:click="addLabelToNewTask" wire:loading.attr="disabled" wire:target="addLabelToNewTask" class="button-secondary whitespace-nowrap px-3">Add label</button>
+                                                    </div>
+                                                </div>
+                                                @error('newTaskLabelName')
+                                                    <p class="form-error">{{ $message }}</p>
+                                                @enderror
+                                                @error('newTaskLabelColor')
+                                                    <p class="form-error">{{ $message }}</p>
+                                                @enderror
+                                                @error('taskLabelIds')
+                                                    <p class="form-error">{{ $message }}</p>
+                                                @enderror
+                                                @error('taskLabelIds.*')
+                                                    <p class="form-error">{{ $message }}</p>
+                                                @enderror
+                                            </fieldset>
 
                                             <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                                 <button type="button" @click="open = false" class="button-secondary">Cancel</button>
@@ -360,6 +404,44 @@
                             <p id="edit-task-description-error" class="form-error">{{ $message }}</p>
                         @enderror
                     </div>
+
+                    <fieldset class="mb-6">
+                        <legend class="form-label">Labels <span class="font-normal text-gray-400">(optional)</span></legend>
+                        @if ($this->userLabels->isNotEmpty())
+                            <div class="grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded-xl p-1 sm:grid-cols-2">
+                                @foreach ($this->userLabels as $label)
+                                    @php($isHexColor = preg_match('/\A#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})\z/i', $label->color_code) === 1)
+                                    <label wire:key="edit-task-label-{{ $editingTaskId }}-{{ $label->id }}" class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800">
+                                        <input type="checkbox" wire:model="editTaskLabelIds" value="{{ $label->id }}" class="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800">
+                                        <span class="size-2.5 shrink-0 rounded-full {{ $isHexColor ? '' : $label->color_code }}" @if ($isHexColor) style="background-color: {{ $label->color_code }}" @endif aria-hidden="true"></span>
+                                        <span class="min-w-0 truncate">{{ $label->name }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        @else
+                            <p class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">No labels available.</p>
+                        @endif
+                        <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                            <input type="text" wire:model="newEditTaskLabelName" maxlength="80" placeholder="New label name" aria-label="New label name" class="form-input flex-1">
+                            <div class="flex items-center gap-2">
+                                <label for="edit-task-label-color" class="sr-only">New label color</label>
+                                <input id="edit-task-label-color" type="color" wire:model="newEditTaskLabelColor" class="size-10 cursor-pointer rounded-lg border border-gray-300 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
+                                <button type="button" wire:click="addLabelToEditedTask" wire:loading.attr="disabled" wire:target="addLabelToEditedTask" class="button-secondary whitespace-nowrap px-3">Add label</button>
+                            </div>
+                        </div>
+                        @error('newEditTaskLabelName')
+                            <p class="form-error">{{ $message }}</p>
+                        @enderror
+                        @error('newEditTaskLabelColor')
+                            <p class="form-error">{{ $message }}</p>
+                        @enderror
+                        @error('editTaskLabelIds')
+                            <p class="form-error">{{ $message }}</p>
+                        @enderror
+                        @error('editTaskLabelIds.*')
+                            <p class="form-error">{{ $message }}</p>
+                        @enderror
+                    </fieldset>
 
                     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                         <button type="button" wire:click="closeTaskEditModal" @click="taskEditModalOpen = false" class="button-secondary">Cancel</button>
