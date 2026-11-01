@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             KanbanSeeder::class,
             LabelSeeder::class,
             ChecklistItemSeeder::class,
+            DemoProjectSeeder::class,
         ]);
     }
 }
