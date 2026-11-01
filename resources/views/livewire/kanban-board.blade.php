@@ -12,6 +12,25 @@
     x-on:keydown.escape.window="if (taskEditModalOpen) { taskEditModalOpen = false; $wire.closeTaskEditModal() } if (createColumnModalOpen) { createColumnModalOpen = false; $wire.closeCreateColumnModal() } if (editColumnModalOpen) { editColumnModalOpen = false; $wire.closeEditColumnModal() } if (deleteColumnModalOpen) { deleteColumnModalOpen = false; deleteConfirmationInput = ''; $wire.closeDeleteColumnConfirmation() }"
 >
     <div class="space-y-10">
+        @if ($project->boards->isNotEmpty())
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div class="w-full max-w-md">
+                    <label for="kanban-task-search" class="form-label">Search tasks by title or label</label>
+                    <input
+                        id="kanban-task-search"
+                        type="search"
+                        wire:model.live.debounce.250ms="search"
+                        maxlength="100"
+                        placeholder="Search this project..."
+                        class="form-input"
+                    >
+                </div>
+                @if (trim($search) !== '')
+                    <p class="text-sm text-gray-500">Showing matching tasks</p>
+                @endif
+            </div>
+        @endif
+
         @forelse ($project->boards as $board)
             <section wire:key="kanban-board-{{ $board->id }}" data-kanban-board-section data-board-id="{{ $board->id }}" x-data="{ reorderMode: false }" x-bind:data-column-reorder-mode="reorderMode ? 'true' : 'false'" x-on:column-reorder-start="reorderMode = true" x-on:column-reorder-end="reorderMode = false" aria-labelledby="board-{{ $board->id }}-title">
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -84,11 +103,18 @@
                                 </div>
                             </div>
 
-                            <div wire:ignore wire:key="kanban-column-dropzone-{{ $column->id }}" class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
+                            <div wire:ignore.self wire:key="kanban-column-dropzone-{{ $column->id }}" class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
                                 @foreach ($column->tasks as $task)
                                     <article class="draggable relative cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
                                         <button type="button" data-task-edit-button data-task-id="{{ $task->id }}" aria-label="Open task: {{ $task->title }}" class="block w-full rounded pr-10 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                                             <span data-task-title class="block text-sm font-medium leading-5 text-gray-800">{{ $task->title }}</span>
+                                            @if ($task->labels->isNotEmpty())
+                                                <span class="mt-2 flex flex-wrap gap-1.5" aria-label="Task labels">
+                                                    @foreach ($task->labels as $label)
+                                                        <span class="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ $label->name }}</span>
+                                                    @endforeach
+                                                </span>
+                                            @endif
                                             <time datetime="{{ $task->created_at->toIso8601String() }}" data-task-created-at class="mt-2 block text-xs text-gray-500">Created {{ $task->created_at->format('M j, Y') }}</time>
                                         </button>
                                         <button
@@ -111,7 +137,7 @@
                                     'hidden' => $column->tasks->isNotEmpty(),
                                     'rounded-lg border border-dashed border-gray-300 bg-white/60 px-3 py-6 text-center',
                                 ])>
-                                    <p class="text-xs text-gray-400">Drop tasks here</p>
+                                    <p class="text-xs text-gray-400">{{ trim($search) === '' ? 'Drop tasks here' : 'No matching tasks' }}</p>
                                 </div>
                             </div>
 
@@ -516,7 +542,15 @@
                 const column = [...$wire.$el.querySelectorAll('[data-kanban-column]')]
                     .find((dropzone) => String(dropzone.dataset.columnId) === String(columnId));
 
-                if (!column || !task) {
+                if (!column || !task || !task.visibleInCurrentSearch) {
+                    return;
+                }
+
+                const existingCard = [...column.querySelectorAll('[data-item-id]')]
+                    .find((item) => item.dataset.itemId === String(task.id));
+
+                if (existingCard) {
+                    syncBoardCountsAndEmptyStates();
                     return;
                 }
 

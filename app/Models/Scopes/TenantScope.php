@@ -6,6 +6,7 @@ namespace App\Models\Scopes;
 
 use App\Models\Board;
 use App\Models\Column;
+use App\Models\Label;
 use App\Models\Note;
 use App\Models\Project;
 use App\Models\Task;
@@ -24,7 +25,7 @@ final class TenantScope implements Scope
             return;
         }
 
-        if ($model instanceof Project || $model instanceof Note) {
+        if ($model instanceof Project || $model instanceof Note || $model instanceof Label) {
             $builder->where($model->qualifyColumn('user_id'), $userId);
 
             return;

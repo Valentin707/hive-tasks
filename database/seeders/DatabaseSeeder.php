@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             SystemAdminSeeder::class,
             KanbanSeeder::class,
+            LabelSeeder::class,
         ]);
     }
 }

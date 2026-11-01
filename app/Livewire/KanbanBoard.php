@@ -42,6 +42,8 @@ class KanbanBoard extends Component
 
     public string $taskDescription = '';
 
+    public string $search = '';
+
     public string $editTaskTitle = '';
 
     public string $editTaskDescription = '';
@@ -99,11 +101,14 @@ class KanbanBoard extends Component
         $this->taskColumnId = null;
         $this->resetValidation();
 
+        $search = mb_strtolower(mb_substr(trim($this->search), 0, 100));
+
         $this->dispatch('task-created', columnId: $columnId, task: [
             'id' => (int) $task->getKey(),
             'title' => $task->title,
             'createdAt' => $task->created_at?->toIso8601String(),
             'createdAtLabel' => $task->created_at?->format('M j, Y'),
+            'visibleInCurrentSearch' => $search === '' || str_contains(mb_strtolower($task->title), $search),
         ]);
     }
 
@@ -426,6 +431,7 @@ class KanbanBoard extends Component
 
     public function render(): View
     {
+        $search = mb_substr(trim($this->search), 0, 100);
         $boardsQuery = fn (HasMany $query) => $query
             ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId))
             ->orderBy('id');
@@ -434,7 +440,15 @@ class KanbanBoard extends Component
             ->with([
                 'boards' => $boardsQuery,
                 'boards.columns' => fn (HasMany $query) => $query->orderBy('position')->orderBy('id'),
-                'boards.columns.tasks' => fn (HasMany $query) => $query->orderBy('position')->orderBy('id'),
+                'boards.columns.tasks' => fn (HasMany $query) => $query
+                    ->with('labels')
+                    ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($search): void {
+                        $query
+                            ->where('title', 'like', "%{$search}%")
+                            ->orWhereHas('labels', fn (Builder $labelQuery): Builder => $labelQuery->where('name', 'like', "%{$search}%"));
+                    }))
+                    ->orderBy('position')
+                    ->orderBy('id'),
             ])
             ->findOrFail($this->projectId);
 
