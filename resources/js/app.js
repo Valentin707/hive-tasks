@@ -3,6 +3,7 @@ import './quill-rich-text-editor.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dragDropManagers = new WeakMap();
+    const boardControllers = new WeakMap();
     const columnScrollers = new WeakSet();
 
     const initializeColumnScroller = (strip) => {
@@ -133,41 +134,38 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDateAndClock();
     window.setInterval(updateDateAndClock, 1000);
 
-    const themeToggle = document.querySelector('[data-theme-toggle]');
+    const themeSwitcher = document.querySelector('[data-theme-switcher]');
 
-    if (themeToggle instanceof HTMLButtonElement) {
+    if (themeSwitcher instanceof HTMLElement) {
+        const themeOptions = [...themeSwitcher.querySelectorAll('button[data-theme-option]')];
         const themeStatus = document.querySelector('[data-theme-status]');
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+        const allowedThemes = new Set(['light', 'dark', 'hive']);
 
         const applyTheme = (theme) => {
-            const isDark = theme === 'dark';
-            const nextTheme = isDark ? 'light' : 'dark';
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.classList.toggle('dark', theme !== 'light');
 
-            document.documentElement.classList.toggle('dark', isDark);
-            themeToggle.setAttribute('aria-pressed', String(isDark));
-            themeToggle.setAttribute('aria-label', `Switch to ${nextTheme} mode`);
-
-            const themeLabel = themeToggle.querySelector('[data-theme-label]');
-            if (themeLabel) {
-                themeLabel.textContent = `${nextTheme === 'dark' ? 'Dark' : 'Light'} theme`;
-            }
-
-            themeToggle.querySelectorAll('[data-theme-icon]').forEach((icon) => {
-                icon.classList.toggle('hidden', icon.dataset.themeIcon !== nextTheme);
+            themeOptions.forEach((themeOption) => {
+                themeOption.setAttribute('aria-pressed', String(themeOption.dataset.themeOption === theme));
             });
         };
 
-        themeToggle.addEventListener('click', async () => {
-            const nextTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+        const persistTheme = async (theme) => {
+            if (!allowedThemes.has(theme) || theme === document.documentElement.dataset.theme) {
+                return;
+            }
 
-            themeToggle.disabled = true;
-            themeToggle.setAttribute('aria-busy', 'true');
+            themeOptions.forEach((themeOption) => {
+                themeOption.disabled = true;
+            });
+            themeSwitcher.setAttribute('aria-busy', 'true');
             if (themeStatus) {
                 themeStatus.textContent = '';
             }
 
             try {
-                const response = await fetch(themeToggle.dataset.themeUrl, {
+                const response = await fetch(themeSwitcher.dataset.themeUrl, {
                     method: 'POST',
                     credentials: 'same-origin',
                     headers: {
@@ -175,11 +173,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': csrfToken,
                     },
-                    body: JSON.stringify({ theme: nextTheme }),
+                    body: JSON.stringify({ theme }),
                 });
                 const payload = await response.json();
 
-                if (!response.ok || payload.theme !== nextTheme) {
+                if (!response.ok || payload.theme !== theme) {
                     throw new Error('Unable to save the theme preference.');
                 }
 
@@ -189,17 +187,35 @@ document.addEventListener('DOMContentLoaded', () => {
                     themeStatus.textContent = 'Could not save the theme preference. Please try again.';
                 }
             } finally {
-                themeToggle.disabled = false;
-                themeToggle.removeAttribute('aria-busy');
+                themeOptions.forEach((themeOption) => {
+                    themeOption.disabled = false;
+                });
+                themeSwitcher.removeAttribute('aria-busy');
             }
+        };
+
+        themeOptions.forEach((themeOption) => {
+            themeOption.addEventListener('click', () => {
+                const theme = themeOption.dataset.themeOption;
+
+                if (theme) {
+                    persistTheme(theme);
+                }
+            });
         });
     }
 
-    document.querySelectorAll('[data-kanban-board]').forEach((board) => {
+    const initializeKanbanBoard = (board) => {
+        if (dragDropManagers.has(board)) {
+            return;
+        }
+
         const dragDropManager = new DragDropManager();
+        const boardController = new AbortController();
 
         dragDropManager.enableDropzone(board.querySelectorAll('[data-kanban-column]'));
         dragDropManagers.set(board, dragDropManager);
+        boardControllers.set(board, boardController);
         board.querySelectorAll('[data-kanban-columns]').forEach(initializeColumnScroller);
 
         let columnDragState = null;
@@ -289,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             boardSection.dispatchEvent(new CustomEvent('column-reorder-start'));
             handle.setAttribute('aria-grabbed', 'true');
-        });
+        }, { signal: boardController.signal });
 
         document.addEventListener('pointermove', (event) => {
             const state = columnDragState;
@@ -354,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (anchor !== state.column) {
                 state.container.insertBefore(state.column, anchor);
             }
-        });
+        }, { signal: boardController.signal });
 
         document.addEventListener('pointerup', (event) => {
             const state = columnDragState;
@@ -370,14 +386,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 && event.clientY <= rect.bottom;
 
             finishColumnDrag(event.pointerId, pointerInsideContainer);
-        });
+        }, { signal: boardController.signal });
 
         document.addEventListener('pointercancel', (event) => {
             finishColumnDrag(event.pointerId, false);
-        });
-    });
+        }, { signal: boardController.signal });
+    };
+
+    document.querySelectorAll('[data-kanban-board]').forEach(initializeKanbanBoard);
 
     new MutationObserver((records) => {
+        const addedKanbanBoards = new Set(records
+            .flatMap((record) => [...record.addedNodes])
+            .filter((node) => node instanceof Element)
+            .flatMap((node) => [
+                ...(node.matches('[data-kanban-board]') ? [node] : []),
+                ...node.querySelectorAll('[data-kanban-board]'),
+            ]));
+
+        addedKanbanBoards.forEach(initializeKanbanBoard);
+
         const addedColumnStrips = new Set(records
             .flatMap((record) => [...record.addedNodes])
             .filter((node) => node instanceof Element)
@@ -413,7 +441,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             removedBoards.forEach((board) => {
                 if (board.matches('[data-kanban-board]') && !board.isConnected) {
+                    boardControllers.get(board)?.abort();
                     dragDropManagers.get(board)?.destroy();
+                    boardControllers.delete(board);
                     dragDropManagers.delete(board);
                 }
             });

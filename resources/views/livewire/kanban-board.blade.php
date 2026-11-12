@@ -3,6 +3,7 @@
     x-data="{ taskEditModalOpen: false, createColumnModalOpen: false, editColumnModalOpen: false, deleteColumnModalOpen: false, columnDeleteName: '', columnDeleteTaskCount: 0, deleteConfirmationInput: '' }"
     x-on:task-edit-opened.window="taskEditModalOpen = true"
     x-on:task-updated.window="taskEditModalOpen = false"
+    x-on:task-deleted.window="taskEditModalOpen = false"
     x-on:column-create-opened.window="createColumnModalOpen = true"
     x-on:column-created.window="createColumnModalOpen = false"
     x-on:column-edit-opened.window="editColumnModalOpen = true"
@@ -105,7 +106,7 @@
 
                             <div wire:ignore.self wire:key="kanban-column-dropzone-{{ $column->id }}" class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain rounded-lg" data-kanban-column data-column-id="{{ $column->id }}">
                                 @foreach ($column->tasks as $task)
-                                    <article wire:key="kanban-task-{{ $task->id }}" class="draggable relative cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
+                                    <article wire:key="kanban-task-{{ $task->id }}" draggable="true" class="draggable relative cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing" data-item-id="{{ $task->id }}">
                                         <button type="button" data-task-edit-button data-task-id="{{ $task->id }}" aria-label="Open task: {{ $task->title }}" class="block w-full rounded pr-10 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                                             <span data-task-title class="block text-sm font-medium leading-5 text-gray-800">{{ $task->title }}</span>
                                             <time datetime="{{ $task->created_at->toIso8601String() }}" data-task-created-at class="mt-2 block text-xs text-gray-500">Created {{ $task->created_at->format('M j, Y') }}</time>
@@ -151,16 +152,18 @@
                                         </button>
                                         <button
                                             type="button"
-                                            data-task-delete-button
-                                            data-task-id="{{ $task->id }}"
-                                            data-task-title="{{ $task->title }}"
-                                            draggable="false"
-                                            aria-label="Delete task: {{ $task->title }}"
-                                            title="Delete task"
-                                            class="absolute right-2 top-2 inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/70"
+                                            data-card-drag-handle
+                                            aria-label="Drag to move task: {{ $task->title }}"
+                                            title="Hold and drag to move task"
+                                            class="absolute right-2 top-2 inline-flex size-8 cursor-grab touch-none select-none items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                                         >
-                                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                                            <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                <circle cx="8" cy="5" r="1.5" />
+                                                <circle cx="16" cy="5" r="1.5" />
+                                                <circle cx="8" cy="12" r="1.5" />
+                                                <circle cx="16" cy="12" r="1.5" />
+                                                <circle cx="8" cy="19" r="1.5" />
+                                                <circle cx="16" cy="19" r="1.5" />
                                             </svg>
                                         </button>
                                     </article>
@@ -426,7 +429,23 @@
                         <h2 id="edit-task-title" class="text-lg font-semibold text-gray-900">Edit task</h2>
                         <p class="mt-1 text-sm text-gray-500">Update the task title or description.</p>
                     </div>
-                    <button type="button" wire:click="closeTaskEditModal" @click="taskEditModalOpen = false" class="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close dialog">×</button>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <button
+                            type="button"
+                            data-task-delete-button
+                            data-task-id="{{ $editingTask->id }}"
+                            data-task-title="{{ $editingTask->title }}"
+                            draggable="false"
+                            aria-label="Delete task: {{ $editingTask->title }}"
+                            title="Delete task"
+                            class="inline-flex size-9 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/70"
+                        >
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                            </svg>
+                        </button>
+                        <button type="button" wire:click="closeTaskEditModal" @click="taskEditModalOpen = false" class="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close dialog">×</button>
+                    </div>
                 </div>
 
                 <form wire:submit="updateTask" class="grid grid-cols-1 gap-5 lg:grid-cols-12">
@@ -654,7 +673,35 @@
                 });
             };
 
-            $wire.$el.addEventListener('card-dropped', (event) => {
+            const boardElement = $wire.$el;
+            let cardMovePending = false;
+            let armedCard = null;
+
+            boardElement.addEventListener('pointerdown', (event) => {
+                const target = event.target instanceof Element ? event.target : null;
+                const handle = target?.closest('[data-card-drag-handle]');
+
+                armedCard = handle?.closest('.draggable') ?? null;
+            }, true);
+
+            boardElement.addEventListener('dragstart', (event) => {
+                const draggedCard = event.target instanceof Element
+                    ? event.target.closest('.draggable')
+                    : null;
+
+                if (!cardMovePending && draggedCard !== null && draggedCard === armedCard) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+            }, true);
+
+            boardElement.addEventListener('dragend', () => {
+                armedCard = null;
+            }, true);
+
+            boardElement.addEventListener('card-dropped', (event) => {
                 const payload = event.detail;
                 const cardId = Number(payload.cardId);
                 const toColumnId = Number(payload.toColumnId);
@@ -665,7 +712,14 @@
                 }
 
                 syncBoardCountsAndEmptyStates();
-                $wire.updateCardOrder(cardId, toColumnId, newPosition);
+
+                cardMovePending = true;
+
+                $wire.updateCardOrder(cardId, toColumnId, newPosition)
+                    .catch(() => $wire.$refresh().catch(() => {}))
+                    .finally(() => {
+                        cardMovePending = false;
+                    });
             });
 
             $wire.$el.addEventListener('click', (event) => {
@@ -722,13 +776,6 @@
 
                 title.textContent = event.detail.title;
                 title.closest('[data-task-edit-button]')?.setAttribute('aria-label', `Open task: ${event.detail.title}`);
-
-                const deleteButton = card.querySelector('[data-task-delete-button]');
-
-                if (deleteButton) {
-                    deleteButton.dataset.taskTitle = event.detail.title;
-                    deleteButton.setAttribute('aria-label', `Delete task: ${event.detail.title}`);
-                }
             });
 
             $wire.$el.addEventListener('task-deleted', (event) => {
@@ -806,6 +853,7 @@
                 }
 
                 const card = document.createElement('article');
+                card.draggable = true;
                 card.className = 'draggable relative cursor-grab rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md active:cursor-grabbing';
                 card.dataset.itemId = String(task.id);
 
@@ -829,18 +877,15 @@
                 createdAt.textContent = `Created ${task.createdAtLabel}`;
                 editButton.append(createdAt);
 
-                const deleteButton = document.createElement('button');
-                deleteButton.type = 'button';
-                deleteButton.dataset.taskDeleteButton = '';
-                deleteButton.dataset.taskId = String(task.id);
-                deleteButton.dataset.taskTitle = task.title;
-                deleteButton.draggable = false;
-                deleteButton.setAttribute('aria-label', `Delete task: ${task.title}`);
-                deleteButton.title = 'Delete task';
-                deleteButton.className = 'absolute right-2 top-2 inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/70';
-                deleteButton.innerHTML = '<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>';
+                const dragHandle = document.createElement('button');
+                dragHandle.type = 'button';
+                dragHandle.dataset.cardDragHandle = '';
+                dragHandle.setAttribute('aria-label', `Drag to move task: ${task.title}`);
+                dragHandle.title = 'Hold and drag to move task';
+                dragHandle.className = 'absolute right-2 top-2 inline-flex size-8 cursor-grab touch-none select-none items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100';
+                dragHandle.innerHTML = '<svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="8" cy="5" r="1.5" /><circle cx="16" cy="5" r="1.5" /><circle cx="8" cy="12" r="1.5" /><circle cx="16" cy="12" r="1.5" /><circle cx="8" cy="19" r="1.5" /><circle cx="16" cy="19" r="1.5" /></svg>';
 
-                card.append(editButton, deleteButton);
+                card.append(editButton, dragHandle);
 
                 const emptyState = column.querySelector('[data-column-empty-state]');
 

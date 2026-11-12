@@ -1,5 +1,9 @@
+@php
+    $themePreference = auth()->user()?->theme_preference;
+    $activeTheme = in_array($themePreference, ['light', 'dark', 'hive'], true) ? $themePreference : 'light';
+@endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => auth()->user()?->theme_preference === 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="{{ $activeTheme }}" @class(['dark' => $activeTheme !== 'light'])>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,6 +15,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-gray-50 font-sans text-gray-900 antialiased">
+    <div class="hive-panel-grid" aria-hidden="true"></div>
     @php
         $userNameParts = preg_split('/\s+/', trim(auth()->user()->name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $userInitials = mb_strtoupper(mb_substr($userNameParts[0] ?? '', 0, 1).mb_substr($userNameParts[1] ?? '', 0, 1));
@@ -65,7 +70,7 @@
         }"
         x-on:resize.window.debounce.100ms="syncViewport()"
         x-on:keydown.escape.window="if (!desktopViewport) { sidebarOpen = false; $nextTick(() => $refs.sidebarToggle.focus()) }"
-        class="min-h-screen lg:flex"
+        class="hive-app-shell min-h-screen lg:flex"
     >
         <button
             type="button"
@@ -210,25 +215,27 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <button
-                        type="button"
-                        class="inline-flex size-10 items-center justify-center gap-2 rounded-lg text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:w-auto sm:px-3"
-                        data-theme-toggle
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div
+                        class="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-1"
+                        role="group"
+                        aria-label="Select visual theme"
+                        data-theme-switcher
                         data-theme-url="{{ route('profile.theme.update') }}"
-                        aria-label="Switch to {{ auth()->user()->theme_preference === 'dark' ? 'light' : 'dark' }} mode"
-                        aria-pressed="{{ auth()->user()->theme_preference === 'dark' ? 'true' : 'false' }}"
-                        title="Switch theme"
                     >
-                        <svg data-theme-icon="dark" @class(['size-5', 'hidden' => auth()->user()->theme_preference === 'dark']) viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.2 15.2A8.4 8.4 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z" />
-                        </svg>
-                        <svg data-theme-icon="light" @class(['size-5', 'hidden' => auth()->user()->theme_preference !== 'dark']) viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                            <circle cx="12" cy="12" r="3.75" />
-                            <path stroke-linecap="round" d="M12 2.75v1.5m0 15.5v1.5m9.25-9.25h-1.5m-15.5 0h-1.5m15.29-6.54-1.06 1.06M7.02 16.98l-1.06 1.06m13.08 0-1.06-1.06M7.02 7.02 5.96 5.96" />
-                        </svg>
-                        <span class="hidden text-sm font-medium sm:inline" data-theme-label>{{ auth()->user()->theme_preference === 'dark' ? 'Light theme' : 'Dark theme' }}</span>
-                    </button>
+                        @foreach (['light' => 'Light', 'dark' => 'Dark', 'hive' => 'Hive'] as $themeOption => $themeLabel)
+                            <button
+                                type="button"
+                                class="theme-option inline-flex min-h-8 items-center justify-center rounded-md border border-transparent px-1.5 text-[9px] font-medium transition hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-wait disabled:opacity-60 sm:px-2"
+                                data-theme-option="{{ $themeOption }}"
+                                aria-label="{{ $themeOption === 'hive' ? 'Hive Command' : $themeLabel }} theme"
+                                title="{{ $themeOption === 'hive' ? 'Hive Command' : $themeLabel }}"
+                                aria-pressed="{{ $activeTheme === $themeOption ? 'true' : 'false' }}"
+                            >
+                                {{ $themeLabel }}
+                            </button>
+                        @endforeach
+                    </div>
                     <span class="sr-only" data-theme-status aria-live="polite"></span>
                     <span class="hidden text-sm text-gray-500 sm:inline">Personal workspace</span>
 

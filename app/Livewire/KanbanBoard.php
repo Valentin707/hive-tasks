@@ -325,6 +325,10 @@ class KanbanBoard extends Component
         $columnId = (int) $task->column_id;
         $task->delete();
 
+        if ($this->editingTaskId === $taskId) {
+            $this->closeTaskEditModal();
+        }
+
         $this->dispatch('task-deleted', taskId: $taskId, columnId: $columnId);
     }
 
@@ -542,29 +546,28 @@ class KanbanBoard extends Component
         abort_if($cardId < 1 || $toColumnId < 1 || $newPosition < 0, 422);
 
         DB::transaction(function () use ($cardId, $toColumnId, $newPosition): void {
-            $task = Task::query()
-                ->whereKey($cardId)
-                ->whereHas('column.board', fn (Builder $query) => $query
-                    ->where('project_id', $this->projectId)
-                    ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId)))
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            $targetColumn = Column::query()
-                ->whereKey($toColumnId)
+            $columns = Column::query()
                 ->whereHas('board', fn (Builder $query) => $query
                     ->where('project_id', $this->projectId)
                     ->when($this->boardId !== null, fn (Builder $query) => $query->whereKey($this->boardId)))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $targetColumn = $columns->first(
+                fn (Column $column): bool => (int) $column->getKey() === $toColumnId,
+            );
+
+            abort_if($targetColumn === null, 404);
+
+            $task = Task::query()
+                ->whereKey($cardId)
+                ->whereIn('column_id', $columns->modelKeys())
+                ->lockForUpdate()
                 ->firstOrFail();
 
             $sourceColumnId = (int) $task->column_id;
             $targetColumnId = (int) $targetColumn->getKey();
-
-            Column::query()
-                ->whereKey(collect([$sourceColumnId, $targetColumnId])->unique()->sort()->values())
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
 
             $destinationTasks = Task::query()
                 ->where('column_id', $targetColumnId)

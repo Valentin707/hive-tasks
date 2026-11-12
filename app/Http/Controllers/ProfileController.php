@@ -20,7 +20,7 @@ class ProfileController extends Controller
     public function updateTheme(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'theme' => ['required', 'string', Rule::in(['light', 'dark'])],
+            'theme' => ['required', 'string', Rule::in(['light', 'dark', 'hive'])],
         ]);
 
         $user = $request->user();
