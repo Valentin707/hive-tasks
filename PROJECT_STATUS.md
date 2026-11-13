@@ -1,7 +1,7 @@
 # HiveTasks Project Status
 
 - **Project:** HiveTasks, a personal project and task workspace
-- **Current revision:** Platform Version 1.3.0 (Subtask Checklist Engine Stable)
+- **Current revision:** Platform Version 1.4.0 (Hive Command Theme and Stable Kanban Moves)
 - **Status:** Core workspace, normalized role access control, and platform administration are operational.
 - **Tech stack:** PHP 8.5, Laravel 13.38, Livewire 4.4, Tailwind CSS 4, Alpine.js, Vite 8, Quill 2, and MySQL (`tasks_hive`). The local development setup uses Apache (httpd).
 
@@ -10,9 +10,10 @@
 - Session-based registration, login, logout, and authenticated workspace routes.
 - Tenant isolation through the global Eloquent `TenantScope` for projects, boards, columns, tasks, checklist items, notes, and labels.
 - Controller-based route entry points for the dashboard, projects, Kanban boards, notes, and profile settings.
-- Responsive application shell with a collapsible sidebar, dynamic page heading, account menu, theme toggle, and date/live-clock footer.
+- Responsive application shell with a collapsible sidebar, dynamic page heading, account menu, three-way theme selector, and date/live-clock footer.
 - Sidebar expanded/collapsed preference persists while navigating between pages.
-- Light and dark themes are available across workspace and administration views.
+- Light, dark, and Hive Command themes are available across workspace and administration views; each user's selection is stored as their profile preference.
+- Hive Command uses the `#0a0a0c` canvas, a fixed grid background, monospace typography, and translucent workspace surfaces. Rich-text previews use compact spacing, including 10px line-height for ordered and unordered lists.
 - `README.md` contains local setup instructions, a user guide, seeded demo credentials, and a suggested presentation flow.
 
 ## Dashboard
@@ -31,7 +32,8 @@
 - Project deletion uses a detailed confirmation dialog that shows child counts and requires typing the project name. Related boards, columns, and tasks are deleted with the project.
 - Kanban columns scroll horizontally without shrinking; mouse dragging pans across the board, and columns preserve a usable height with their own task scrolling.
 - Columns can be added, reordered, renamed, recolored, or deleted. Column deletion requires typing `confirm` and removes the column's tasks.
-- Tasks can be created, moved between columns, edited with rich-text descriptions, and deleted with confirmation.
+- Tasks can be created, moved between columns, edited with rich-text descriptions, and deleted from the task edit modal with confirmation.
+- Card movement starts only from the dedicated top-right drag handle. The linked `drag-drop-manager` repairs draggable state after Livewire DOM morphs and releases stale card/dropzone listeners; reorder transactions lock columns in a consistent order.
 - Task checklists use a dedicated `checklist_items` table with a cascading foreign key to `tasks`; deleting a task also deletes its checklist items.
 - The Livewire board eagerly loads both labels and checklists with `with(['labels', 'checklists'])` to avoid per-task relation queries.
 - Checklist items can be added, checked or unchecked, edited with a 1000 ms debounced save, and deleted from the task edit modal.
@@ -45,6 +47,14 @@
 
 - Notes workspace supports title search, note creation, selection, deletion, and rich-text editing with automatic saving.
 - Profile settings support name/email updates, password changes with current-password verification, and theme preference.
+
+## OAuth2 SSO Readiness (Planning Only)
+
+- OAuth2/OIDC SSO is not implemented. Authentication currently uses the custom `AuthController` with Laravel's session-backed `web` guard and Eloquent `User` provider; there is no Socialite, Passport, Sanctum, or `personal_access_tokens` table.
+- `users.id` is an auto-incrementing `BIGINT UNSIGNED`. Direct `user_id` references exist in `projects`, `notes`, `labels`, and `role_user`, all as `BIGINT UNSIGNED` foreign keys with cascading deletion.
+- `sessions.user_id` is a nullable indexed `BIGINT UNSIGNED` without a foreign key. Database sessions are the configured default.
+- The current `users` table has a unique email and no `role` column. Roles are normalized in `roles` and `role_user` (`Administrator` / `admin`, `Project Owner` / `po`).
+- Any UUID migration must account for the direct ownership and role foreign keys, plus the non-constrained session user identifier. No UUID or SSO migration has been started.
 
 ## Platform Administration, RBAC, and Provisioning
 
@@ -87,9 +97,11 @@ User access is stored in a standalone `roles` table and the many-to-many `role_u
 - Blade view caching and compiled-view PHP syntax checks passed for the project Kanban and checklist modal updates.
 - `php artisan route:list --path=admin -v` confirmed the admin route has both authentication and `EnsureUserIsAdmin` middleware.
 - `npm run build` completed successfully. Vite warned that the local Node.js 20.17.0 is below its supported minimum of 20.19.0 (or 22.12.0).
+- After the drag manager fix, the Vite build and Blade view cache completed successfully; the linked library observes Livewire `draggable` attribute changes and restores card dragging.
 - Automated tests were not run during the administration implementation.
 
 ## Future Upgrade Possibilities
 
+- Plan OAuth2/OIDC SSO, including the user-linking and integer-to-UUID migration strategy.
 - Full label-catalog management, including renaming and deleting labels.
 - File attachments within task cards.
