@@ -169,6 +169,21 @@
                     <span x-cloak x-show="sidebarOpen" x-transition.opacity>Notes</span>
                 </a>
 
+                <a
+                    href="{{ rtrim((string) config('services.hive.base_url'), '/') }}"
+                    title="HIVE HUB"
+                    aria-label="HIVE HUB"
+                    x-on:click="if (!desktopViewport) sidebarOpen = false"
+                    :class="sidebarOpen ? 'justify-start px-3' : 'justify-center px-2'"
+                    class="flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                >
+                    <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.25" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.9 9h16.2M3.9 15h16.2M12 3.75c2 2.2 3 4.95 3 8.25s-1 6.05-3 8.25c-2-2.2-3-4.95-3-8.25s1-6.05 3-8.25Z" />
+                    </svg>
+                    <span x-cloak x-show="sidebarOpen" x-transition.opacity>HIVE HUB</span>
+                </a>
+
                 @if (auth()->user()->isAdmin())
                     <a
                         href="{{ route('admin.users.index') }}"

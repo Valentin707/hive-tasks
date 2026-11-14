@@ -6,12 +6,10 @@ namespace App\Livewire\Admin;
 
 use App\Models\Project;
 use App\Models\Role;
-use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -24,11 +22,9 @@ class UserManagement extends Component
 {
     use WithPagination;
 
-    public bool $registrationEnabled = false;
-
     public string $search = '';
 
-    public ?int $editingUserId = null;
+    public ?string $editingUserId = null;
 
     public string $editingUserName = '';
 
@@ -38,14 +34,11 @@ class UserManagement extends Component
 
     public string $newEmail = '';
 
-    public string $newPassword = '';
-
     public int|string|null $newRoleId = null;
 
     public function mount(): void
     {
         $this->authorizeAdministrator();
-        $this->registrationEnabled = SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED);
     }
 
     public function updatingSearch(): void
@@ -57,7 +50,7 @@ class UserManagement extends Component
     {
         $this->authorizeAdministrator();
 
-        $this->reset(['newName', 'newEmail', 'newPassword', 'newRoleId']);
+        $this->reset(['newName', 'newEmail', 'newRoleId']);
         $this->resetValidation();
     }
 
@@ -68,23 +61,13 @@ class UserManagement extends Component
         $this->newEmail = Str::lower(trim($this->newEmail));
         $this->newRoleId = $this->newRoleId === '' ? null : $this->newRoleId;
 
-        try {
-            $validated = $this->validate([
-                'newName' => ['required', 'string', 'max:255'],
-                'newEmail' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
-                'newPassword' => ['required', 'string', 'min:12', 'max:255'],
-                'newRoleId' => ['nullable', 'integer', 'min:1', Rule::exists('roles', 'id')],
-            ]);
-        } catch (ValidationException $exception) {
-            $this->newPassword = '';
+        $validated = $this->validate([
+            'newName' => ['required', 'string', 'max:255'],
+            'newEmail' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
+            'newRoleId' => ['nullable', 'integer', 'min:1', Rule::exists('roles', 'id')],
+        ]);
 
-            throw $exception;
-        }
-
-        $plainPassword = $validated['newPassword'];
-        $this->newPassword = '';
-
-        DB::transaction(function () use ($actor, $plainPassword, $validated): void {
+        DB::transaction(function () use ($actor, $validated): void {
             $this->lockAndAuthorizeAdministrator($actor);
 
             $role = $validated['newRoleId'] === null
@@ -94,54 +77,28 @@ class UserManagement extends Component
             $user = User::query()->create([
                 'name' => $validated['newName'],
                 'email' => $validated['newEmail'],
-                'password' => Hash::make($plainPassword),
             ]);
             $user->roles()->attach($role->getKey());
 
             $this->createStarterWorkspace($user);
         });
 
-        $this->reset(['newName', 'newEmail', 'newPassword', 'newRoleId']);
+        $this->reset(['newName', 'newEmail', 'newRoleId']);
         $this->resetValidation();
         $this->resetPage();
-        session()->flash('admin-user-created', 'The account, starter project, board, and columns are ready.');
+        session()->flash('admin-user-created', 'The local profile and starter workspace are ready. The profile will sync with Hive Hub on first sign-in.');
         $this->dispatch('user-account-created');
     }
 
-    public function toggleRegistration(): void
-    {
-        $actor = $this->authorizeAdministrator();
-
-        $this->registrationEnabled = DB::transaction(function () use ($actor): bool {
-            $this->lockAndAuthorizeAdministrator($actor);
-
-            $setting = SystemSetting::query()
-                ->where('key', SystemSetting::REGISTRATION_ENABLED)
-                ->lockForUpdate()
-                ->first();
-
-            $currentlyEnabled = filter_var($setting?->value ?? 'false', FILTER_VALIDATE_BOOLEAN);
-            $enabled = ! $currentlyEnabled;
-
-            SystemSetting::query()->updateOrCreate(
-                ['key' => SystemSetting::REGISTRATION_ENABLED],
-                ['value' => $enabled ? 'true' : 'false'],
-            );
-
-            return $enabled;
-        });
-
-        session()->flash('admin-settings-status', 'Registration setting updated.');
-    }
-
-    public function openRoleEditor(int $userId): void
+    public function openRoleEditor(string $userId): void
     {
         $this->authorizeAdministrator();
+        Validator::make(['userId' => $userId], ['userId' => ['required', 'uuid', 'exists:users,id']])->validate();
 
         $targetUser = User::query()->findOrFail($userId);
         $selectedRoleId = $targetUser->roles()->orderBy('roles.id')->value('roles.id');
 
-        $this->editingUserId = (int) $targetUser->getKey();
+        $this->editingUserId = (string) $targetUser->getKey();
         $this->editingUserName = $targetUser->name;
         $this->selectedRoleId = is_numeric($selectedRoleId) ? (int) $selectedRoleId : null;
 
@@ -168,14 +125,14 @@ class UserManagement extends Component
         $this->updateUserRole($this->editingUserId, $this->selectedRoleId);
     }
 
-    public function updateUserRole(int $userId, int $roleId): void
+    public function updateUserRole(string $userId, int $roleId): void
     {
         $actor = $this->authorizeAdministrator();
 
         Validator::make(
             ['userId' => $userId, 'roleId' => $roleId],
             [
-                'userId' => ['required', 'integer', 'min:1', 'exists:users,id'],
+                'userId' => ['required', 'uuid', 'exists:users,id'],
                 'roleId' => ['required', 'integer', 'min:1', 'exists:roles,id'],
             ],
         )->validate();
@@ -185,7 +142,7 @@ class UserManagement extends Component
             $targetUser = User::query()->lockForUpdate()->findOrFail($userId);
             $targetRole = Role::query()->lockForUpdate()->findOrFail($roleId);
 
-            if ((int) $targetUser->getKey() === (int) $actor->getKey() && (int) $targetRole->getKey() !== (int) $administratorRole->getKey()) {
+            if ($targetUser->getKey() === $actor->getKey() && (int) $targetRole->getKey() !== (int) $administratorRole->getKey()) {
                 throw ValidationException::withMessages([
                     'roleId' => 'You cannot remove your own administrator access.',
                 ]);
@@ -203,42 +160,23 @@ class UserManagement extends Component
         $this->dispatch('user-role-updated');
     }
 
-    public function resetUserPassword(int $userId, string $newPlainPassword): void
-    {
-        $actor = $this->authorizeAdministrator();
-
-        $validated = Validator::make(
-            ['newPlainPassword' => $newPlainPassword],
-            ['newPlainPassword' => ['required', 'string', 'min:12', 'max:255']],
-        )->validate();
-
-        DB::transaction(function () use ($actor, $userId, $validated): void {
-            $this->lockAndAuthorizeAdministrator($actor);
-            $targetUser = User::query()->lockForUpdate()->findOrFail($userId);
-
-            $targetUser->forceFill([
-                'password' => Hash::make($validated['newPlainPassword']),
-            ])->save();
-        });
-
-        session()->flash('admin-user-status', 'User password reset successfully.');
-        $this->dispatch('user-password-reset');
-    }
-
-    public function deleteUserAccount(int $userId, string $confirmationInput): void
+    public function deleteUserAccount(string $userId, string $confirmationInput): void
     {
         $actor = $this->authorizeAdministrator();
 
         Validator::make(
-            ['confirmationInput' => $confirmationInput],
-            ['confirmationInput' => ['required', 'string', 'max:255']],
+            ['userId' => $userId, 'confirmationInput' => $confirmationInput],
+            [
+                'userId' => ['required', 'uuid', 'exists:users,id'],
+                'confirmationInput' => ['required', 'string', 'max:255'],
+            ],
         )->validate();
 
         DB::transaction(function () use ($actor, $confirmationInput, $userId): void {
             $administratorRole = $this->lockAndAuthorizeAdministrator($actor);
             $targetUser = User::query()->lockForUpdate()->findOrFail($userId);
 
-            if ((int) $targetUser->getKey() === (int) $actor->getKey()) {
+            if ($targetUser->getKey() === $actor->getKey()) {
                 throw ValidationException::withMessages([
                     'deleteUser' => 'You cannot delete the account you are currently using.',
                 ]);
@@ -251,7 +189,6 @@ class UserManagement extends Component
             }
 
             $this->ensureAnotherAdministratorRemains($targetUser, $administratorRole);
-
             $targetUser->delete();
         });
 
@@ -262,8 +199,6 @@ class UserManagement extends Component
     public function render(): View
     {
         $this->authorizeAdministrator();
-
-        $this->registrationEnabled = SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED);
 
         $search = trim($this->search);
         $users = User::query()
@@ -341,9 +276,6 @@ class UserManagement extends Component
         $this->resetValidation();
     }
 
-    /**
-     * Create the starter workspace without letting the tenant observer assign the acting admin as owner.
-     */
     private function createStarterWorkspace(User $user): void
     {
         $project = Project::withoutEvents(

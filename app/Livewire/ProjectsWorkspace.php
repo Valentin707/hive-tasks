@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Models\Column;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
@@ -35,8 +36,9 @@ class ProjectsWorkspace extends Component
             'description' => ['nullable', 'string', 'max:20000'],
         ]);
 
-        abort_unless(auth()->check(), 401);
-        $userId = (int) auth()->id();
+        $user = auth()->user();
+        abort_unless($user instanceof User, 401);
+        $userId = (string) $user->getKey();
 
         DB::transaction(function () use ($validated, $userId): void {
             $project = new Project([

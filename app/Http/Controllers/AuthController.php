@@ -5,88 +5,55 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Role;
-use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
-    public function showLogin(): View
+    public function redirectToIdentityProvider(): RedirectResponse
     {
-        return view('auth.login', [
-            'registrationEnabled' => SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED),
-        ]);
+        return Socialite::driver('hive')->redirect();
     }
 
-    public function login(Request $request): RedirectResponse
+    public function handleIdentityProviderCallback(Request $request): RedirectResponse
     {
-        $this->normalizeEmail($request);
+        if ($request->filled('error')) {
+            return redirect()->route('logout.complete')->with('auth-error', 'Hive Hub sign-in was not completed.');
+        }
 
-        $credentials = $request->validate([
+        $hiveUser = Socialite::driver('hive')->user();
+        $profile = Validator::make([
+            'id' => $hiveUser->getId(),
+            'name' => $hiveUser->getName(),
+            'email' => $hiveUser->getEmail(),
+        ], [
+            'id' => ['required', 'string', 'uuid'],
+            'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255'],
-            'password' => ['required', 'string'],
-        ]);
+        ])->validate();
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        $identity = [
+            'id' => Str::lower($profile['id']),
+            'name' => trim($profile['name']),
+            'email' => Str::lower(trim($profile['email'])),
+        ];
+
+        if ($identity['name'] === '') {
             throw ValidationException::withMessages([
-                'email' => 'The provided credentials are incorrect.',
+                'name' => 'Hive Hub returned an empty display name.',
             ]);
         }
 
-        $request->session()->regenerate();
+        $user = DB::transaction(fn (): User => $this->synchronizeUser($identity));
 
-        return redirect()->intended(route('dashboard'));
-    }
-
-    public function showRegister(): View|RedirectResponse
-    {
-        if (! SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED)) {
-            return redirect()->route('register.closed');
-        }
-
-        return view('auth.register');
-    }
-
-    public function showRegistrationClosed(): View|RedirectResponse
-    {
-        if (SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED)) {
-            return redirect()->route('register');
-        }
-
-        return view('auth.registration-closed');
-    }
-
-    public function register(Request $request): RedirectResponse
-    {
-        if (! SystemSetting::booleanFor(SystemSetting::REGISTRATION_ENABLED)) {
-            return redirect()->route('register.closed');
-        }
-
-        $this->normalizeEmail($request);
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:12', 'confirmed'],
-        ]);
-
-        $user = DB::transaction(function () use ($validated): User {
-            $projectOwnerRole = Role::query()
-                ->where('slug', Role::PROJECT_OWNER_SLUG)
-                ->firstOrFail();
-            $user = User::query()->create($validated);
-            $user->roles()->attach($projectOwnerRole->getKey());
-
-            return $user;
-        });
-
-        Auth::login($user);
+        Auth::login($user, true);
         $request->session()->regenerate();
 
         return redirect()->route('dashboard');
@@ -95,19 +62,93 @@ class AuthController extends Controller
     public function logout(Request $request): RedirectResponse
     {
         Auth::guard('web')->logout();
-
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        return redirect()->route('logout.complete');
     }
 
-    private function normalizeEmail(Request $request): void
+    /**
+     * @param  array{id: string, name: string, email: string}  $identity
+     */
+    private function synchronizeUser(array $identity): User
     {
-        $email = $request->input('email');
+        $user = User::query()->lockForUpdate()->find($identity['id']);
 
-        if (is_string($email)) {
-            $request->merge(['email' => Str::lower(trim($email))]);
+        if ($user instanceof User) {
+            $this->ensureEmailIsAvailable($identity['email'], $identity['id']);
+            $user->forceFill([
+                'name' => $identity['name'],
+                'email' => $identity['email'],
+            ])->save();
+
+            return $user;
+        }
+
+        $user = User::query()
+            ->whereRaw('LOWER(email) = ?', [$identity['email']])
+            ->lockForUpdate()
+            ->first();
+
+        if ($user instanceof User) {
+            $user->setAttribute('id', $identity['id']);
+            $user->forceFill([
+                'name' => $identity['name'],
+                'email' => $identity['email'],
+            ])->save();
+
+            $administratorRole = Role::query()
+                ->where('slug', Role::ADMIN_SLUG)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $initialAdministratorEmail = Str::lower(trim((string) config('services.hive.initial_admin_email')));
+
+            if (! $administratorRole->users()->exists() || $identity['email'] === $initialAdministratorEmail) {
+                $user->roles()->syncWithoutDetaching([$administratorRole->getKey()]);
+            }
+
+            return $user;
+        }
+
+        $administratorRole = Role::query()
+            ->where('slug', Role::ADMIN_SLUG)
+            ->lockForUpdate()
+            ->firstOrFail();
+        $projectOwnerRole = Role::query()
+            ->where('slug', Role::PROJECT_OWNER_SLUG)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $user = new User;
+        $user->forceFill([
+            'id' => $identity['id'],
+            'name' => $identity['name'],
+            'email' => $identity['email'],
+            'password' => null,
+        ])->save();
+        $user->roles()->attach($projectOwnerRole->getKey());
+
+        $initialAdministratorEmail = Str::lower(trim((string) config('services.hive.initial_admin_email')));
+        $hasAdministrator = $administratorRole->users()->exists();
+
+        if (! $hasAdministrator || $identity['email'] === $initialAdministratorEmail) {
+            $user->roles()->attach($administratorRole->getKey());
+        }
+
+        return $user;
+    }
+
+    private function ensureEmailIsAvailable(string $email, string $userId): void
+    {
+        $emailBelongsToAnotherUser = User::query()
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->where('id', '<>', $userId)
+            ->exists();
+
+        if ($emailBelongsToAnotherUser) {
+            throw ValidationException::withMessages([
+                'email' => 'This Hive Hub email is already linked to a different local account.',
+            ]);
         }
     }
 }

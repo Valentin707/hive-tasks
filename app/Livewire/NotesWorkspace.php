@@ -53,7 +53,7 @@ class NotesWorkspace extends Component
         $project = $this->contextProject();
 
         $note = new Note;
-        $note->user_id = (int) $user->getKey();
+        $note->user_id = $user->getKey();
         $note->project_id = $project?->getKey();
         $note->title = $validated['newNoteTitle'];
         $note->content = RichTextSanitizer::sanitize($validated['newNoteContent'] ?? '');

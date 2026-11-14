@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'hive' => [
+        'base_url' => env('HIVE_BASE_URL', 'https://hive.test'),
+        'client_id' => env('HIVE_CLIENT_ID'),
+        'client_secret' => env('HIVE_CLIENT_SECRET'),
+        'redirect' => env('HIVE_REDIRECT_URI', 'https://tasks.hive.test/auth/callback'),
+        'verify' => ! in_array(strtolower(trim((string) env('HIVE_VERIFY_SSL', 'true'))), ['false', '0', 'off', 'no'], true),
+        'ca_bundle' => env('HIVE_CA_BUNDLE'),
+        'initial_admin_email' => env('HIVE_INITIAL_ADMIN_EMAIL', 'admin@tasks.hive'),
+    ],
+
 ];

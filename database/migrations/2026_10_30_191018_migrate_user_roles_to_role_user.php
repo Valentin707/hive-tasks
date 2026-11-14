@@ -37,7 +37,7 @@ return new class extends Migration
                     $roleId = $legacyRole === 'admin' ? $administratorRoleId : $projectOwnerRoleId;
 
                     $roleAssignments[] = [
-                        'user_id' => (int) $user->id,
+                        'user_id' => (string) $user->id,
                         'role_id' => $roleId,
                     ];
                 }

@@ -3,31 +3,22 @@
         activeDeleteUserTargetId: null,
         targetUserName: '',
         confirmationInput: '',
-        activeResetUserTargetId: null,
-        resetUserName: '',
-        resetPasswordInput: '',
         createUserModalOpen: false,
         closeDeleteModal() {
             this.activeDeleteUserTargetId = null;
             this.targetUserName = '';
             this.confirmationInput = '';
         },
-        closeResetModal() {
-            this.activeResetUserTargetId = null;
-            this.resetUserName = '';
-            this.resetPasswordInput = '';
-        },
     }"
     x-on:user-account-deleted.window="closeDeleteModal()"
-    x-on:user-password-reset.window="closeResetModal()"
     x-on:user-account-created.window="createUserModalOpen = false"
-    x-on:keydown.escape.window="if (createUserModalOpen) { createUserModalOpen = false; $wire.closeCreateUserModal() }; if (activeDeleteUserTargetId !== null) closeDeleteModal(); if (activeResetUserTargetId !== null) closeResetModal()"
+    x-on:keydown.escape.window="if (createUserModalOpen) { createUserModalOpen = false; $wire.closeCreateUserModal() }; if (activeDeleteUserTargetId !== null) closeDeleteModal()"
 >
     <div class="mb-8 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
             <p class="mb-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">Platform administration</p>
             <h1 class="text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">User Management</h1>
-            <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-500">Manage platform access, account credentials, and registration availability.</p>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-500">Manage Hive Hub profiles, local roles, and project access.</p>
         </div>
 
         <div class="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
@@ -66,51 +57,6 @@
             {{ session('admin-settings-status') ?? session('admin-user-status') }}
         </div>
     @endif
-
-    <section aria-labelledby="platform-settings-heading" class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm shadow-gray-900/5 sm:p-6 dark:border-gray-200 dark:bg-gray-100 dark:shadow-black/20">
-        <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-start gap-4">
-                <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300">
-                    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3.75v2m0 12.5v2m8.25-8.25h-2m-12.5 0h-2m14.08-5.83-1.42 1.42M7.59 16.41l-1.42 1.42m11.66 0-1.42-1.42M7.59 7.59 6.17 6.17" />
-                        <circle cx="12" cy="12" r="3.25" />
-                    </svg>
-                </span>
-                <div>
-                    <h2 id="platform-settings-heading" class="text-base font-semibold text-gray-900">Platform settings</h2>
-                    <p class="mt-1 text-sm leading-6 text-gray-500">Control whether new accounts can be created from the public registration page.</p>
-                </div>
-            </div>
-
-            <button
-                type="button"
-                role="switch"
-                aria-label="Public user registration"
-                aria-checked="{{ $registrationEnabled ? 'true' : 'false' }}"
-                wire:click="toggleRegistration"
-                wire:loading.attr="disabled"
-                wire:target="toggleRegistration"
-                class="inline-flex w-full items-center justify-between gap-4 rounded-xl border border-gray-200 px-4 py-3 text-left transition hover:bg-gray-50 disabled:cursor-wait sm:w-auto sm:min-w-56 dark:border-gray-200 dark:hover:bg-gray-50"
-            >
-                <span>
-                    <span class="block text-sm font-semibold text-gray-900">Public registration</span>
-                    <span class="mt-0.5 block text-xs text-gray-500" wire:loading.remove wire:target="toggleRegistration">{{ $registrationEnabled ? 'Enabled' : 'Disabled' }}</span>
-                    <span class="mt-0.5 hidden text-xs text-gray-500" wire:loading wire:target="toggleRegistration">Saving setting…</span>
-                </span>
-                <span @class([
-                    'relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors',
-                    'bg-indigo-600' => $registrationEnabled,
-                    'bg-gray-300 dark:bg-gray-400' => ! $registrationEnabled,
-                ]) aria-hidden="true">
-                    <span @class([
-                        'absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform',
-                        'translate-x-5' => $registrationEnabled,
-                        'translate-x-0.5' => ! $registrationEnabled,
-                    ])></span>
-                </span>
-            </button>
-        </div>
-    </section>
 
     <section aria-labelledby="users-table-heading" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm shadow-gray-900/5 dark:border-gray-200 dark:bg-gray-100 dark:shadow-black/20">
         <div class="flex flex-col gap-2 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-gray-200">
@@ -156,15 +102,10 @@
                                 <td class="whitespace-nowrap px-5 py-4 text-gray-500">{{ $user->created_at?->format('M j, Y') ?? '—' }}</td>
                                 <td class="whitespace-nowrap px-5 py-4">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        <button type="button" wire:click="openRoleEditor({{ (int) $user->getKey() }})" wire:loading.attr="disabled" wire:target="openRoleEditor" class="rounded-lg px-2.5 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-300 dark:hover:bg-indigo-950/50">Change role</button>
+                                        <button type="button" @click="$wire.openRoleEditor(@js((string) $user->getKey()))" wire:loading.attr="disabled" wire:target="openRoleEditor" class="rounded-lg px-2.5 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-300 dark:hover:bg-indigo-950/50">Change role</button>
                                         <button
                                             type="button"
-                                            @click="activeResetUserTargetId = {{ (int) $user->getKey() }}; resetUserName = @js($user->name); resetPasswordInput = ''; $nextTick(() => $refs.resetPasswordInput.focus())"
-                                            class="rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-700 dark:hover:bg-gray-200 dark:hover:text-gray-900"
-                                        >Reset password</button>
-                                        <button
-                                            type="button"
-                                            @click="activeDeleteUserTargetId = {{ (int) $user->getKey() }}; targetUserName = @js($user->name); confirmationInput = ''; $nextTick(() => $refs.deleteConfirmationInput.focus())"
+                                            @click="activeDeleteUserTargetId = @js((string) $user->getKey()); targetUserName = @js($user->name); confirmationInput = ''; $nextTick(() => $refs.deleteConfirmationInput.focus())"
                                             aria-label="Delete {{ $user->name }}"
                                             class="rounded-lg px-2.5 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
                                         >Delete</button>
@@ -188,7 +129,7 @@
                     </svg>
                 </span>
                 <h3 class="mt-4 text-sm font-semibold text-gray-900">{{ trim($search) === '' ? 'No user accounts found' : 'No matching users' }}</h3>
-                <p class="mt-1 text-sm text-gray-500">{{ trim($search) === '' ? 'User accounts will appear here after registration.' : 'Try another name or email address.' }}</p>
+                <p class="mt-1 text-sm text-gray-500">{{ trim($search) === '' ? 'Synced accounts will appear here after Hive Hub sign-in.' : 'Try another name or email address.' }}</p>
             </div>
         @endif
     </section>
@@ -206,7 +147,7 @@
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">Account provisioning</p>
                         <h2 id="create-user-title" class="mt-1 text-lg font-semibold text-gray-900">Add a new user</h2>
-                        <p class="mt-1 text-sm leading-6 text-gray-500">A starter project and Kanban board will be created automatically.</p>
+                <p class="mt-1 text-sm leading-6 text-gray-500">A starter project and board will be created. The profile syncs with Hive Hub on first sign-in.</p>
                     </div>
                 </div>
                 <button type="button" @click="createUserModalOpen = false; $wire.closeCreateUserModal()" class="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-200" aria-label="Close new user form">×</button>
@@ -227,15 +168,6 @@
                     @error('newEmail')
                         <p id="new-user-email-error" class="form-error">{{ $message }}</p>
                     @enderror
-                </div>
-
-                <div>
-                    <label for="new-user-password" class="form-label">Temporary password</label>
-                    <input id="new-user-password" type="password" wire:model="newPassword" minlength="12" maxlength="255" autocomplete="new-password" required class="form-input" @error('newPassword') aria-invalid="true" aria-describedby="new-user-password-error" @enderror>
-                    @error('newPassword')
-                        <p id="new-user-password-error" class="form-error">{{ $message }}</p>
-                    @enderror
-                    <p class="mt-1.5 text-xs text-gray-500">Use at least 12 characters.</p>
                 </div>
 
                 <div>
@@ -299,40 +231,6 @@
             </section>
         </div>
     @endif
-
-    <div x-cloak x-show="activeResetUserTargetId !== null" x-transition.opacity class="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-gray-950/50 p-4 sm:items-center" @click.self="closeResetModal()">
-        <section role="dialog" aria-modal="true" aria-labelledby="reset-user-password-title" class="my-auto w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-200 dark:bg-gray-100">
-            <div class="mb-6 flex items-start gap-4">
-                <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-                    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                        <rect x="4.75" y="10.25" width="14.5" height="10" rx="2" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 10.25V7a4 4 0 0 1 8 0v3.25m-4 4v2.5" />
-                    </svg>
-                </span>
-                <div class="min-w-0">
-                    <h2 id="reset-user-password-title" class="text-lg font-semibold text-gray-900">Reset account password</h2>
-                    <p class="mt-1 truncate text-sm text-gray-500" x-text="resetUserName"></p>
-                </div>
-            </div>
-
-            <div class="mb-6">
-                <label for="admin-new-password" class="form-label">New password</label>
-                <input id="admin-new-password" x-ref="resetPasswordInput" x-model="resetPasswordInput" type="password" autocomplete="new-password" minlength="12" maxlength="255" class="form-input" @error('newPlainPassword') aria-invalid="true" aria-describedby="admin-new-password-error" @enderror>
-                @error('newPlainPassword')
-                    <p id="admin-new-password-error" class="form-error">{{ $message }}</p>
-                @enderror
-                <p class="mt-1.5 text-xs text-gray-500">Use at least 12 characters.</p>
-            </div>
-
-            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <button type="button" @click="closeResetModal()" class="button-secondary">Cancel</button>
-                <button type="button" @click="$wire.resetUserPassword(activeResetUserTargetId, resetPasswordInput)" :disabled="resetPasswordInput.length < 12" class="button-primary" wire:loading.attr="disabled" wire:target="resetUserPassword">
-                    <span wire:loading.remove wire:target="resetUserPassword">Save new password</span>
-                    <span wire:loading wire:target="resetUserPassword">Saving…</span>
-                </button>
-            </div>
-        </section>
-    </div>
 
     <div x-cloak x-show="activeDeleteUserTargetId !== null" x-transition.opacity class="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-gray-950/60 p-4 sm:items-center" @click.self="closeDeleteModal()">
         <section role="alertdialog" aria-modal="true" aria-labelledby="delete-user-title" aria-describedby="delete-user-description" class="my-auto w-full max-w-lg rounded-2xl border border-red-200 bg-white p-6 shadow-2xl shadow-gray-950/25 sm:p-7 dark:border-red-900/70 dark:bg-gray-100 dark:shadow-black/50">
