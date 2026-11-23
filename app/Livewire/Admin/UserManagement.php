@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
+use App\Models\Label;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
@@ -79,6 +80,7 @@ class UserManagement extends Component
                 'email' => $validated['newEmail'],
             ]);
             $user->roles()->attach($role->getKey());
+            Label::ensureDefaultLabelsFor($user);
 
             $this->createStarterWorkspace($user);
         });

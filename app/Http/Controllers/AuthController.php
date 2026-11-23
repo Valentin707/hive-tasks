@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Label;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -134,6 +135,8 @@ class AuthController extends Controller
         if (! $hasAdministrator || $identity['email'] === $initialAdministratorEmail) {
             $user->roles()->attach($administratorRole->getKey());
         }
+
+        Label::ensureDefaultLabelsFor($user);
 
         return $user;
     }

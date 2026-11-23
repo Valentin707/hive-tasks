@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Label;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -37,6 +38,7 @@ class SystemAdminSeeder extends Seeder
             $administrator->password = null;
             $administrator->save();
             $administrator->roles()->syncWithoutDetaching([$administratorRole->getKey()]);
+            Label::ensureDefaultLabelsFor($administrator);
         });
     }
 }

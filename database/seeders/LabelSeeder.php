@@ -27,6 +27,8 @@ class LabelSeeder extends Seeder
     {
         User::query()->chunkById(100, function (Collection $users): void {
             foreach ($users as $user) {
+                Label::ensureDefaultLabelsFor($user);
+
                 $labels = [];
 
                 foreach (self::SAMPLE_LABELS as $name => $colorCode) {
